@@ -93,7 +93,7 @@ export default function Profile() {
   const stats = {
     balance: parseFloat(wallet.coins),
     moby: parseFloat(wallet.mobyTokens),
-    tokMoby: parseFloat(wallet.tokMoby),
+    tokMoby: parseFloat(wallet.mobyCoins),
   };
 
   const userLevel = getUserLevel(stats.balance);

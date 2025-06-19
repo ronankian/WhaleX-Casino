@@ -149,7 +149,7 @@ export default function Wallet() {
   const handleConvert = () => {
     const maxAmount = convertDirection === "moby-to-tokmoby" ? 
       parseFloat(wallet.mobyTokens) : 
-      parseFloat(wallet.tokMoby) / 5000;
+      parseFloat(wallet.mobyCoins) / 5000;
     
     if (convertAmount > 0 && convertAmount <= maxAmount) {
       convertMutation.mutate({
@@ -162,7 +162,7 @@ export default function Wallet() {
   const stats = {
     balance: parseFloat(wallet.coins),
     moby: parseFloat(wallet.mobyTokens),
-    tokMoby: parseFloat(wallet.tokMoby),
+    tokMoby: parseFloat(wallet.mobyCoins),
   };
 
   return (
@@ -423,7 +423,7 @@ export default function Wallet() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {deposits && deposits.length > 0 ? (
+                  {Array.isArray(deposits) && deposits.length > 0 ? (
                     deposits.slice(0, 5).map((deposit: any) => (
                       <div key={deposit.id} className="flex items-center justify-between py-3 border-b border-gray-700 last:border-b-0">
                         <div className="flex items-center space-x-3">
@@ -471,7 +471,7 @@ export default function Wallet() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {withdrawals && withdrawals.length > 0 ? (
+                  {Array.isArray(withdrawals) && withdrawals.length > 0 ? (
                     withdrawals.slice(0, 5).map((withdrawal: any) => (
                       <div key={withdrawal.id} className="flex items-center justify-between py-3 border-b border-gray-700 last:border-b-0">
                         <div className="flex items-center space-x-3">

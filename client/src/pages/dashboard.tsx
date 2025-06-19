@@ -198,14 +198,14 @@ export default function Dashboard() {
         </div>
 
         {/* Recent Activity */}
-        {gameHistory && gameHistory.length > 0 && (
+        {Array.isArray(gameHistory) && gameHistory.length > 0 && (
           <Card className="glass-card border-gold-500/20">
             <CardHeader>
               <CardTitle className="text-xl font-semibold text-white">Recent Activity</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {gameHistory.slice(0, 5).map((game) => (
+                {(Array.isArray(gameHistory) ? gameHistory.slice(0, 5) : []).map((game) => (
                   <div key={game.id} className="flex items-center justify-between py-3 border-b border-gray-700 last:border-b-0">
                     <div className="flex items-center space-x-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${

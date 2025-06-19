@@ -53,8 +53,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    if (walletData) {
-      setWallet(walletData);
+    if (
+      walletData &&
+      typeof walletData === "object" &&
+      "id" in walletData &&
+      "userId" in walletData &&
+      "coins" in walletData &&
+      "mobyTokens" in walletData &&
+      "mobyCoins" in walletData
+    ) {
+      setWallet(walletData as Wallet);
       localStorage.setItem("whalex_wallet", JSON.stringify(walletData));
     }
   }, [walletData]);
