@@ -1,6 +1,7 @@
-import { useAuth } from "@/hooks/use-auth";
+import React from 'react';
+import { useAuth } from "../../hooks/use-auth";
 import { Link, useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
+import { Button } from "../ui/button";
 import { Fish, Home, Gamepad2, Wallet, User } from "lucide-react";
 
 export default function Header() {
@@ -14,15 +15,12 @@ export default function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 glass-card border-b border-gold-500/20">
       <nav className="container mx-auto px-4 py-4 flex items-center justify-between">
-        <Link href="/" className="flex items-center space-x-3">
-          <div className="w-10 h-10 whale-gradient rounded-full flex items-center justify-center animate-float">
-            <svg viewBox="0 0 100 100" className="w-6 h-6 text-gold-950">
-              <path d="M20 50 Q30 30, 50 50 Q70 30, 80 50 L70 60 Q50 70, 30 60 Z" fill="currentColor"/>
-              <path d="M25 45 Q35 35, 45 45" stroke="currentColor" strokeWidth="2" fill="none"/>
-              <path d="M55 45 Q65 35, 75 45" stroke="currentColor" strokeWidth="2" fill="none"/>
-            </svg>
-          </div>
-          <h1 className="text-2xl font-display font-bold text-gold-500">WhaleX</h1>
+        <Link href="/" className="flex items-center">
+          <img 
+            src="/images/brand.png" 
+            alt="WhaleX Casino"
+            className="h-12"
+          />
         </Link>
 
         {isAuthenticated && (
