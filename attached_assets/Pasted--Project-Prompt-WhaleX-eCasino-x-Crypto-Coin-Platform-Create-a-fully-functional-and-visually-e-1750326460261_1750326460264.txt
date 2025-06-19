@@ -1,0 +1,90 @@
+🔱 Project Prompt: WhaleX – eCasino x Crypto Coin Platform
+Create a fully functional and visually engaging eCasino platform named WhaleX, integrating cryptocurrency mechanics through the in-game token $MOBY.
+________________________________________
+🌊 Platform Overview
+Name: WhaleX
+Theme: Luxury oceanic meets golden high-stakes — inspired by GOLDEN-X Online Casino on Behance
+Inspiration: You may enhance or rework the visual style to better align with WhaleX branding — more “ocean whale luxury meets golden casino.”
+________________________________________
+🎰 Core Game Mechanics
+Implement 7 unique slot games, each with their own rules and graphics:
+🎮 Game List:
+1.	Mines – Grid-based game where players avoid hidden mines and can cash out early.
+2.	Crash – A multiplier that rises until it crashes. Players must cash out before it does.
+3.	Plinko – Ball drops through a pegboard and lands in random multiplier zones.
+4.	Hi-Lo – Card-based game; guess if the next card is higher or lower.
+5.	Dice Roll – Roll between 1–100, with adjustable risk levels.
+6.	Slot 777 – Traditional slot machine.
+7.	Roulette – Classic spinning wheel roulette game.
+🔔 Each slot game has a 0–10% chance to win $MOBY, the platform’s main cryptocurrency token. And have a how to play guide.
+________________________________________
+🪙 Betting Denominations
+Available bet amounts:
+₱0.25, ₱0.50, ₱1.00, ₱1.50, ₱2.00, ₱5.00, ₱10.00, ₱50.00, ₱100.00, ₱500.00, ₱1,000.00
+Currency mapping:
+•	1 Coin = 1 PHP
+•	1 $MOBY = 5,000 Coins (convertible to in-game TokMOBY)
+________________________________________
+📦 Features to Implement
+🧍 User:
+•	Simple Registration / Login (mock credentials, no external authentication)
+•	User Dashboard / Homepage (includes navigation to all 7 games)
+•	Wallet Page: view $MOBY, TokMOBY, and coin balances
+•	Convert $MOBY ↔ TokMOBY (1 $MOBY = 5,000 Coins)
+•	Deposit / Top-up Page:
+o	Input amount → choose payment method → upload receipt
+•	Withdraw Function (for coin or $MOBY)
+•	All users start with 1,000 coins (for demo/testing)
+🧑‍💼 Admin:
+•	Admin login with fixed credentials:
+Username: admin | Password: admin1234
+•	View & Monitor:
+o	User activities
+o	Deposits and uploaded receipts
+o	Confirm or reject top-up requests
+•	Manage Users (ban, suspend)
+•	GameBank overview
+________________________________________
+🎲 Game System Logic
+•	Each game should be provably fair, using:
+o	Server Seed, Client Seed, and Nonce
+o	HMAC-SHA256 based random outcome generation
+•	Mines and Crash must include “Cashout” options mid-game.
+________________________________________
+🖼️ Asset Requirements
+The AI must also:
+•	Generate fully animated and visually rich assets for all games.
+•	All images must:
+o	Match the style of each game (e.g., glowing dice for Dice Roll, a digital crash graph, neon playing cards).
+o	Be themed with the WhaleX brand (oceanic, luxury, motion).
+o	Include animated effects or motion elements (e.g., shimmering, bouncing, spinning).
+•	Use animations (GIF, WebP, or video loops) where appropriate to avoid bland UI.
+•	Generate:
+o	Homepage design
+o	Game thumbnails
+o	UI buttons (Play, Cashout, Bet, etc.)
+o	Token and coin icons ($MOBY, TokMOBY, PHP Coin)
+________________________________________
+🧩 Technical Stack
+•	Backend: Traditional PHP (no frameworks)
+•	Frontend: HTML, CSS or Bootstrap, Vanilla JavaScript
+•	Database: MySQL via XAMPP (local only)
+•	RESTful API for data operations
+•	Local hosting via VSCode + XAMPP on localhost
+________________________________________
+💾 Database Requirements
+•	Use MySQL (with SQL dump file)
+•	All project files must be runnable locally.
+•	Include:
+o	User table (with role support: admin, player)
+o	Wallet table (coin balance, $MOBY, TokMOBY)
+o	Games log table (for result tracking)
+o	Deposit table (with receipt images and status)
+o	Admin activity log (optional)
+________________________________________
+📎 Final Notes
+•	Ensure the whole platform runs locally using XAMPP and VSCode.
+•	Follow proper folder structure and RESTful conventions.
+•	Package the database (.sql file) with the project files.
+•	Use minimal third-party libraries unless necessary for animation/UI polish.
+•	If unsure about design or structure, feel free to ask or suggest improvements.
