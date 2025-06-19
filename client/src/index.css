@@ -1,0 +1,206 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(20, 14.3%, 4.1%);
+  --muted: hsl(60, 4.8%, 95.9%);
+  --muted-foreground: hsl(25, 5.3%, 44.7%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(20, 14.3%, 4.1%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(20, 14.3%, 4.1%);
+  --border: hsl(20, 5.9%, 90%);
+  --input: hsl(20, 5.9%, 90%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(60, 4.8%, 95.9%);
+  --secondary-foreground: hsl(24, 9.8%, 10%);
+  --accent: hsl(60, 4.8%, 95.9%);
+  --accent-foreground: hsl(24, 9.8%, 10%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --destructive-foreground: hsl(60, 9.1%, 97.8%);
+  --ring: hsl(20, 14.3%, 4.1%);
+  --radius: 0.5rem;
+  
+  /* WhaleX Custom Colors */
+  --ocean-50: hsl(198, 100%, 97%);
+  --ocean-100: hsl(198, 100%, 94%);
+  --ocean-200: hsl(198, 100%, 86%);
+  --ocean-300: hsl(198, 100%, 76%);
+  --ocean-400: hsl(198, 100%, 64%);
+  --ocean-500: hsl(199, 89%, 48%);
+  --ocean-600: hsl(200, 98%, 39%);
+  --ocean-700: hsl(201, 100%, 32%);
+  --ocean-800: hsl(201, 100%, 27%);
+  --ocean-900: hsl(202, 100%, 24%);
+  --ocean-950: hsl(215, 61%, 8%);
+  
+  --gold-50: hsl(48, 100%, 96%);
+  --gold-100: hsl(48, 96%, 89%);
+  --gold-200: hsl(48, 97%, 77%);
+  --gold-300: hsl(46, 97%, 65%);
+  --gold-400: hsl(43, 96%, 56%);
+  --gold-500: hsl(38, 92%, 50%);
+  --gold-600: hsl(32, 95%, 44%);
+  --gold-700: hsl(26, 91%, 37%);
+  --gold-800: hsl(23, 83%, 31%);
+  --gold-900: hsl(22, 78%, 26%);
+  --gold-950: hsl(51, 100%, 50%);
+}
+
+.dark {
+  --background: hsl(240, 10%, 3.9%);
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 3.7%, 15.9%);
+  --muted-foreground: hsl(240, 5%, 64.9%);
+  --popover: hsl(240, 10%, 3.9%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 3.9%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(240, 3.7%, 15.9%);
+  --input: hsl(240, 3.7%, 15.9%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(240, 3.7%, 15.9%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(240, 3.7%, 15.9%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(240, 4.9%, 83.9%);
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  .whale-gradient {
+    background: linear-gradient(135deg, hsl(215, 61%, 8%) 0%, hsl(223, 84%, 22%) 50%, hsl(200, 98%, 39%) 100%);
+  }
+  
+  .gold-gradient {
+    background: linear-gradient(135deg, hsl(51, 100%, 50%) 0%, hsl(38, 92%, 50%) 50%, hsl(32, 95%, 44%) 100%);
+  }
+  
+  .ocean-bg {
+    background: linear-gradient(to bottom right, hsl(215, 61%, 8%), hsl(202, 100%, 24%), hsl(201, 100%, 27%));
+  }
+  
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+  
+  .animate-wave {
+    animation: wave 3s ease-in-out infinite;
+  }
+  
+  .animate-spin-slow {
+    animation: spin 3s linear infinite;
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes glow {
+  from { box-shadow: 0 0 20px hsl(51, 100%, 50%); }
+  to { 
+    box-shadow: 0 0 30px hsl(51, 100%, 50%), 0 0 40px hsl(51, 100%, 50%); 
+  }
+}
+
+@keyframes wave {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(5deg); }
+}
+
+/* Custom text colors */
+.text-ocean-400 { color: hsl(198, 100%, 64%); }
+.text-ocean-500 { color: hsl(199, 89%, 48%); }
+.text-ocean-950 { color: hsl(215, 61%, 8%); }
+.text-gold-400 { color: hsl(43, 96%, 56%); }
+.text-gold-500 { color: hsl(38, 92%, 50%); }
+.text-gold-950 { color: hsl(51, 100%, 50%); }
+
+/* Custom background colors */
+.bg-ocean-400 { background-color: hsl(198, 100%, 64%); }
+.bg-ocean-500 { background-color: hsl(199, 89%, 48%); }
+.bg-ocean-600 { background-color: hsl(200, 98%, 39%); }
+.bg-ocean-700 { background-color: hsl(201, 100%, 32%); }
+.bg-ocean-800 { background-color: hsl(201, 100%, 27%); }
+.bg-ocean-900 { background-color: hsl(202, 100%, 24%); }
+.bg-ocean-950 { background-color: hsl(215, 61%, 8%); }
+.bg-gold-400 { background-color: hsl(43, 96%, 56%); }
+.bg-gold-500 { background-color: hsl(38, 92%, 50%); }
+.bg-gold-600 { background-color: hsl(32, 95%, 44%); }
+.bg-gold-950 { background-color: hsl(51, 100%, 50%); }
+
+/* Custom border colors */
+.border-ocean-500 { border-color: hsl(199, 89%, 48%); }
+.border-ocean-700 { border-color: hsl(201, 100%, 32%); }
+.border-gold-500 { border-color: hsl(38, 92%, 50%); }
+
+/* Rajdhani font for display text */
+.font-display {
+  font-family: 'Rajdhani', sans-serif;
+}
+
+/* Game specific styles */
+.slot-reel {
+  transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.slot-reel.spinning {
+  animation: spin 0.1s linear infinite;
+}
+
+.dice-roll {
+  transition: transform 0.3s ease-in-out;
+}
+
+.dice-roll:hover {
+  transform: rotateX(180deg);
+}
+
+.card-flip {
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+}
+
+.card-flip.flipped {
+  transform: rotateY(180deg);
+}
+
+.crash-line {
+  stroke: hsl(51, 100%, 50%);
+  stroke-width: 3;
+  fill: none;
+}
+
+.crash-area {
+  fill: url(#crashGradient);
+  opacity: 0.3;
+}

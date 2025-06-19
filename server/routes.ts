@@ -1,0 +1,336 @@
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import { z } from "zod";
+import { insertUserSchema, insertGameResultSchema, insertDepositSchema, insertWithdrawalSchema } from "@shared/schema";
+import { storage } from "./storage";
+import crypto from "crypto";
+
+const loginSchema = z.object({
+  username: z.string().min(1),
+  password: z.string().min(1),
+});
+
+const gamePlaySchema = z.object({
+  gameType: z.enum(["dice", "slots", "hilo", "crash"]),
+  betAmount: z.number().positive(),
+  gameData: z.record(z.any()),
+});
+
+const tokenConvertSchema = z.object({
+  amount: z.number().positive(),
+  direction: z.enum(["moby-to-tokmoby", "tokmoby-to-moby"]),
+});
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  
+  // Authentication routes
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const userData = insertUserSchema.parse(req.body);
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(userData.username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      const existingEmail = await storage.getUserByEmail(userData.email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+
+      const user = await storage.createUser(userData);
+      const wallet = await storage.getWallet(user.id);
+      
+      res.json({ 
+        user: { ...user, password: undefined },
+        wallet 
+      });
+    } catch (error) {
+      res.status(400).json({ message: "Invalid registration data" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = loginSchema.parse(req.body);
+      
+      const user = await storage.getUserByUsername(username);
+      if (!user || user.password !== password) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      if (!user.isActive) {
+        return res.status(403).json({ message: "Account is suspended" });
+      }
+
+      const wallet = await storage.getWallet(user.id);
+      
+      res.json({ 
+        user: { ...user, password: undefined },
+        wallet 
+      });
+    } catch (error) {
+      res.status(400).json({ message: "Invalid login data" });
+    }
+  });
+
+  // User routes
+  app.get("/api/users/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const user = await storage.getUser(id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({ ...user, password: undefined });
+    } catch (error) {
+      res.status(400).json({ message: "Invalid user ID" });
+    }
+  });
+
+  // Wallet routes
+  app.get("/api/wallet/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const wallet = await storage.getWallet(userId);
+      if (!wallet) {
+        return res.status(404).json({ message: "Wallet not found" });
+      }
+      res.json(wallet);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid user ID" });
+    }
+  });
+
+  app.post("/api/wallet/:userId/convert", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const { amount, direction } = tokenConvertSchema.parse(req.body);
+      
+      const wallet = await storage.getWallet(userId);
+      if (!wallet) {
+        return res.status(404).json({ message: "Wallet not found" });
+      }
+
+      let updates: Partial<typeof wallet> = {};
+      
+      if (direction === "moby-to-tokmoby") {
+        const mobyBalance = parseFloat(wallet.mobyTokens);
+        if (mobyBalance < amount) {
+          return res.status(400).json({ message: "Insufficient MOBY balance" });
+        }
+        
+        updates.mobyTokens = (mobyBalance - amount).toFixed(4);
+        updates.tokMoby = (parseFloat(wallet.tokMoby) + (amount * 5000)).toFixed(2);
+      } else {
+        const tokMobyBalance = parseFloat(wallet.tokMoby);
+        const requiredTokMoby = amount * 5000;
+        
+        if (tokMobyBalance < requiredTokMoby) {
+          return res.status(400).json({ message: "Insufficient TokMOBY balance" });
+        }
+        
+        updates.tokMoby = (tokMobyBalance - requiredTokMoby).toFixed(2);
+        updates.mobyTokens = (parseFloat(wallet.mobyTokens) + amount).toFixed(4);
+      }
+
+      const updatedWallet = await storage.updateWallet(userId, updates);
+      res.json(updatedWallet);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid conversion data" });
+    }
+  });
+
+  // Game routes
+  app.post("/api/games/play", async (req, res) => {
+    try {
+      const { gameType, betAmount, gameData } = gamePlaySchema.parse(req.body);
+      const userId = parseInt(req.body.userId);
+      
+      const wallet = await storage.getWallet(userId);
+      if (!wallet) {
+        return res.status(404).json({ message: "Wallet not found" });
+      }
+
+      const balance = parseFloat(wallet.coins);
+      if (balance < betAmount) {
+        return res.status(400).json({ message: "Insufficient balance" });
+      }
+
+      // Generate provably fair seeds
+      const serverSeed = crypto.randomBytes(32).toString('hex');
+      const clientSeed = gameData.clientSeed || crypto.randomBytes(16).toString('hex');
+      const nonce = gameData.nonce || 1;
+
+      // Game logic based on type
+      let result: any = {};
+      let isWin = false;
+      let multiplier = 0;
+      let payout = 0;
+      let mobyReward = 0;
+
+      switch (gameType) {
+        case "dice":
+          const diceTarget = gameData.target || 50;
+          const diceRoll = generateProvablyFairNumber(serverSeed, clientSeed, nonce, 1, 100);
+          isWin = diceRoll < diceTarget;
+          multiplier = isWin ? (99 / Math.max(1, diceTarget - 1)) : 0;
+          result = { roll: diceRoll, target: diceTarget };
+          break;
+
+        case "slots":
+          const symbols = ['fish', 'crown', 'gem', 'ship', 'anchor'];
+          const reels = Array(5).fill(0).map((_, i) => 
+            symbols[generateProvablyFairNumber(serverSeed, clientSeed, nonce + i, 0, symbols.length - 1)]
+          );
+          
+          // Simple win logic - check for matching symbols
+          const matches = reels.filter(symbol => symbol === reels[0]).length;
+          isWin = matches >= 3;
+          multiplier = matches >= 5 ? 1000 : matches >= 4 ? 100 : matches >= 3 ? 10 : 0;
+          result = { reels, matches };
+          break;
+
+        case "hilo":
+          const currentCard = gameData.currentCard || generateProvablyFairNumber(serverSeed, clientSeed, nonce, 1, 13);
+          const nextCard = generateProvablyFairNumber(serverSeed, clientSeed, nonce + 1, 1, 13);
+          const guess = gameData.guess; // "higher" or "lower"
+          
+          isWin = (guess === "higher" && nextCard > currentCard) || 
+                  (guess === "lower" && nextCard < currentCard);
+          multiplier = isWin ? (gameData.streak || 1) * 2 : 0;
+          result = { currentCard, nextCard, guess };
+          break;
+
+        case "crash":
+          const crashPoint = generateCrashPoint(serverSeed, clientSeed, nonce);
+          const cashOutPoint = gameData.cashOut || 1.0;
+          
+          isWin = cashOutPoint <= crashPoint;
+          multiplier = isWin ? cashOutPoint : 0;
+          result = { crashPoint, cashOut: cashOutPoint };
+          break;
+      }
+
+      payout = isWin ? betAmount * multiplier : 0;
+      
+      // 0-10% chance to win MOBY tokens
+      if (isWin && Math.random() < 0.1) {
+        mobyReward = betAmount * 0.001; // Small MOBY reward
+      }
+
+      // Update wallet
+      const newBalance = balance - betAmount + payout;
+      const newMobyBalance = parseFloat(wallet.mobyTokens) + mobyReward;
+      
+      await storage.updateWallet(userId, {
+        coins: newBalance.toFixed(2),
+        mobyTokens: newMobyBalance.toFixed(4)
+      });
+
+      // Record game result
+      const gameResult = await storage.createGameResult({
+        userId,
+        gameId: 1,
+        gameType,
+        betAmount: betAmount.toString(),
+        payout: payout.toFixed(2),
+        multiplier: multiplier.toFixed(2),
+        result: JSON.stringify(result),
+        isWin,
+        mobyReward: mobyReward.toFixed(4),
+        serverSeed,
+        clientSeed,
+        nonce
+      });
+
+      res.json({
+        gameResult,
+        wallet: await storage.getWallet(userId),
+        result
+      });
+    } catch (error) {
+      console.error("Game play error:", error);
+      res.status(400).json({ message: "Invalid game data" });
+    }
+  });
+
+  app.get("/api/games/history/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const limit = parseInt(req.query.limit as string) || 10;
+      
+      const history = await storage.getGameResults(userId, limit);
+      res.json(history);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid user ID" });
+    }
+  });
+
+  // Deposit routes
+  app.post("/api/deposits", async (req, res) => {
+    try {
+      const depositData = insertDepositSchema.parse(req.body);
+      const deposit = await storage.createDeposit(depositData);
+      res.json(deposit);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid deposit data" });
+    }
+  });
+
+  app.get("/api/deposits/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const deposits = await storage.getDeposits(userId);
+      res.json(deposits);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid user ID" });
+    }
+  });
+
+  // Withdrawal routes
+  app.post("/api/withdrawals", async (req, res) => {
+    try {
+      const withdrawalData = insertWithdrawalSchema.parse(req.body);
+      const withdrawal = await storage.createWithdrawal(withdrawalData);
+      res.json(withdrawal);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid withdrawal data" });
+    }
+  });
+
+  app.get("/api/withdrawals/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const withdrawals = await storage.getWithdrawals(userId);
+      res.json(withdrawals);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid user ID" });
+    }
+  });
+
+  const httpServer = createServer(app);
+  return httpServer;
+}
+
+// Helper functions for provably fair gaming
+function generateProvablyFairNumber(serverSeed: string, clientSeed: string, nonce: number, min: number, max: number): number {
+  const combinedSeed = crypto.createHmac('sha256', serverSeed)
+    .update(`${clientSeed}:${nonce}`)
+    .digest('hex');
+  
+  const seedNumber = parseInt(combinedSeed.substring(0, 8), 16);
+  return min + (seedNumber % (max - min + 1));
+}
+
+function generateCrashPoint(serverSeed: string, clientSeed: string, nonce: number): number {
+  const hash = crypto.createHmac('sha256', serverSeed)
+    .update(`${clientSeed}:${nonce}`)
+    .digest('hex');
+  
+  const seedNumber = parseInt(hash.substring(0, 8), 16);
+  const crashPoint = Math.max(1.01, seedNumber / 0xFFFFFFFF * 10);
+  
+  return Math.round(crashPoint * 100) / 100;
+}
