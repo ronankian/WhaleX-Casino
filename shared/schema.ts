@@ -18,7 +18,7 @@ export const wallets = pgTable("wallets", {
   userId: integer("user_id").notNull(),
   coins: decimal("coins", { precision: 10, scale: 2 }).notNull().default("1000.00"),
   mobyTokens: decimal("moby_tokens", { precision: 10, scale: 4 }).notNull().default("0.0000"),
-  tokMoby: decimal("tok_moby", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  mobyCoins: decimal("moby_coins", { precision: 10, scale: 2 }).notNull().default("0.00"),
 });
 
 export const games = pgTable("games", {

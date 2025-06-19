@@ -11,7 +11,7 @@ const loginSchema = z.object({
 });
 
 const gamePlaySchema = z.object({
-  gameType: z.enum(["dice", "slots", "hilo", "crash"]),
+  gameType: z.enum(["dice", "slots", "hilo", "crash", "mines", "plinko", "roulette"]),
   betAmount: z.number().positive(),
   gameData: z.record(z.any()),
 });
@@ -122,16 +122,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         updates.mobyTokens = (mobyBalance - amount).toFixed(4);
-        updates.tokMoby = (parseFloat(wallet.tokMoby) + (amount * 5000)).toFixed(2);
+        updates.mobyCoins = (parseFloat(wallet.mobyCoins) + (amount * 5000)).toFixed(2);
       } else {
-        const tokMobyBalance = parseFloat(wallet.tokMoby);
-        const requiredTokMoby = amount * 5000;
+        const mobyCoinsBalance = parseFloat(wallet.mobyCoins);
+        const requiredMobyCoins = amount * 5000;
         
-        if (tokMobyBalance < requiredTokMoby) {
-          return res.status(400).json({ message: "Insufficient TokMOBY balance" });
+        if (mobyCoinsBalance < requiredMobyCoins) {
+          return res.status(400).json({ message: "Insufficient MOBY Token balance" });
         }
         
-        updates.tokMoby = (tokMobyBalance - requiredTokMoby).toFixed(2);
+        updates.mobyCoins = (mobyCoinsBalance - requiredMobyCoins).toFixed(2);
         updates.mobyTokens = (parseFloat(wallet.mobyTokens) + amount).toFixed(4);
       }
 
@@ -199,8 +199,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           isWin = (guess === "higher" && nextCard > currentCard) || 
                   (guess === "lower" && nextCard < currentCard);
-          multiplier = isWin ? (gameData.streak || 1) * 2 : 0;
+          multiplier = isWin ? Math.max(1, (gameData.streak || 0) + 1) * 1.5 : 0;
           result = { currentCard, nextCard, guess };
+          break;
+
+        case "mines":
+          const gridSize = gameData.gridSize || 25;
+          const mineCount = gameData.mineCount || 5;
+          const revealedCells = gameData.revealedCells || [];
+          const selectedCell = gameData.selectedCell;
+          
+          // Generate mine positions
+          const mines = [];
+          for (let i = 0; i < mineCount; i++) {
+            mines.push(generateProvablyFairNumber(serverSeed, clientSeed, nonce + i, 0, gridSize - 1));
+          }
+          
+          isWin = !mines.includes(selectedCell);
+          multiplier = isWin ? Math.pow(1.2, revealedCells.length + 1) : 0;
+          result = { selectedCell, isMine: !isWin, revealedCells: [...revealedCells, selectedCell] };
+          break;
+
+        case "plinko":
+          const rows = gameData.rows || 16;
+          const ballPath = [];
+          let position = rows / 2;
+          
+          for (let i = 0; i < rows; i++) {
+            const direction = generateProvablyFairNumber(serverSeed, clientSeed, nonce + i, 0, 1);
+            position += direction === 0 ? -0.5 : 0.5;
+            ballPath.push(position);
+          }
+          
+          const finalPosition = Math.floor(position);
+          const multipliers = [1000, 130, 26, 9, 4, 2, 1.5, 1, 0.5, 1, 1.5, 2, 4, 9, 26, 130, 1000];
+          multiplier = multipliers[Math.max(0, Math.min(finalPosition, multipliers.length - 1))];
+          isWin = multiplier >= 1;
+          result = { ballPath, finalPosition, multiplier };
+          break;
+
+        case "roulette":
+          const betType = gameData.betType || "number";
+          const betValue = gameData.betValue || 0;
+          const winningNumber = generateProvablyFairNumber(serverSeed, clientSeed, nonce, 0, 36);
+          
+          switch (betType) {
+            case "number":
+              isWin = winningNumber === betValue;
+              multiplier = isWin ? 35 : 0;
+              break;
+            case "red":
+              const redNumbers = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
+              isWin = redNumbers.includes(winningNumber);
+              multiplier = isWin ? 2 : 0;
+              break;
+            case "black":
+              const blackNumbers = [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35];
+              isWin = blackNumbers.includes(winningNumber);
+              multiplier = isWin ? 2 : 0;
+              break;
+            case "even":
+              isWin = winningNumber % 2 === 0 && winningNumber !== 0;
+              multiplier = isWin ? 2 : 0;
+              break;
+            case "odd":
+              isWin = winningNumber % 2 === 1;
+              multiplier = isWin ? 2 : 0;
+              break;
+            default:
+              multiplier = 0;
+          }
+          result = { winningNumber, betType, betValue };
           break;
 
         case "crash":

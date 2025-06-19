@@ -11,6 +11,9 @@ import DiceGame from "@/pages/games/dice";
 import SlotsGame from "@/pages/games/slots";
 import HiLoGame from "@/pages/games/hilo";
 import CrashGame from "@/pages/games/crash";
+import MinesGame from "@/pages/games/mines";
+import PlinkoGame from "@/pages/games/plinko";
+import RouletteGame from "@/pages/games/roulette";
 import Wallet from "@/pages/wallet";
 import Profile from "@/pages/profile";
 import NotFound from "@/pages/not-found";
@@ -24,6 +27,9 @@ function Router() {
       <Route path="/games/slots" component={SlotsGame} />
       <Route path="/games/hilo" component={HiLoGame} />
       <Route path="/games/crash" component={CrashGame} />
+      <Route path="/games/mines" component={MinesGame} />
+      <Route path="/games/plinko" component={PlinkoGame} />
+      <Route path="/games/roulette" component={RouletteGame} />
       <Route path="/wallet" component={Wallet} />
       <Route path="/profile" component={Profile} />
       <Route component={NotFound} />

@@ -83,8 +83,13 @@ export class MemStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentUserId++;
     const user: User = {
-      ...insertUser,
       id,
+      username: insertUser.username,
+      email: insertUser.email,
+      password: insertUser.password,
+      role: insertUser.role || "player",
+      isActive: insertUser.isActive ?? true,
+      level: insertUser.level || 1,
       joinDate: new Date()
     };
     this.users.set(id, user);
@@ -115,7 +120,7 @@ export class MemStorage implements IStorage {
       ...insertWallet,
       coins: insertWallet.coins || "1000.00",
       mobyTokens: insertWallet.mobyTokens || "0.0000",
-      tokMoby: insertWallet.tokMoby || "0.00"
+      mobyCoins: insertWallet.mobyCoins || "0.00"
     };
     this.wallets.set(id, wallet);
     return wallet;
@@ -133,8 +138,19 @@ export class MemStorage implements IStorage {
   async createGameResult(insertResult: InsertGameResult): Promise<GameResult> {
     const id = this.currentGameResultId++;
     const result: GameResult = {
-      ...insertResult,
       id,
+      userId: insertResult.userId,
+      gameId: insertResult.gameId,
+      gameType: insertResult.gameType,
+      betAmount: insertResult.betAmount,
+      payout: insertResult.payout || "0",
+      multiplier: insertResult.multiplier || null,
+      result: insertResult.result || null,
+      isWin: insertResult.isWin || false,
+      mobyReward: insertResult.mobyReward || null,
+      serverSeed: insertResult.serverSeed,
+      clientSeed: insertResult.clientSeed,
+      nonce: insertResult.nonce,
       createdAt: new Date()
     };
     this.gameResults.set(id, result);
@@ -151,8 +167,12 @@ export class MemStorage implements IStorage {
   async createDeposit(insertDeposit: InsertDeposit): Promise<Deposit> {
     const id = this.currentDepositId++;
     const deposit: Deposit = {
-      ...insertDeposit,
       id,
+      status: insertDeposit.status || "pending",
+      userId: insertDeposit.userId,
+      amount: insertDeposit.amount,
+      paymentMethod: insertDeposit.paymentMethod,
+      receiptUrl: insertDeposit.receiptUrl || null,
       createdAt: new Date(),
       processedAt: null
     };
@@ -183,8 +203,11 @@ export class MemStorage implements IStorage {
   async createWithdrawal(insertWithdrawal: InsertWithdrawal): Promise<Withdrawal> {
     const id = this.currentWithdrawalId++;
     const withdrawal: Withdrawal = {
-      ...insertWithdrawal,
       id,
+      status: insertWithdrawal.status || "pending",
+      userId: insertWithdrawal.userId,
+      amount: insertWithdrawal.amount,
+      currency: insertWithdrawal.currency,
       createdAt: new Date(),
       processedAt: null
     };

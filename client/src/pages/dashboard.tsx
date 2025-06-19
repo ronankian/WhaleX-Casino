@@ -12,7 +12,10 @@ import {
   Dices,
   Crown,
   Spade,
-  BarChart3
+  BarChart3,
+  Gem,
+  Circle,
+  Target
 } from "lucide-react";
 import { formatCurrency, formatMoby } from "@/lib/game-utils";
 
@@ -67,15 +70,39 @@ export default function Dashboard() {
       icon: BarChart3,
       color: "from-orange-500 to-orange-600",
       path: "/games/crash"
+    },
+    {
+      id: "mines",
+      name: "Mines",
+      description: "Find gems while avoiding hidden mines",
+      icon: Gem,
+      color: "from-emerald-500 to-emerald-600",
+      path: "/games/mines"
+    },
+    {
+      id: "plinko",
+      name: "Plinko",
+      description: "Drop the ball and watch it bounce to fortune",
+      icon: Circle,
+      color: "from-indigo-500 to-indigo-600",
+      path: "/games/plinko"
+    },
+    {
+      id: "roulette",
+      name: "Roulette",
+      description: "Place your bets and spin the wheel",
+      icon: Target,
+      color: "from-red-500 to-pink-600",
+      path: "/games/roulette"
     }
   ];
 
   const stats = {
     balance: parseFloat(wallet.coins),
     moby: parseFloat(wallet.mobyTokens),
-    tokMoby: parseFloat(wallet.tokMoby),
-    gamesPlayed: gameHistory?.length || 0,
-    winRate: gameHistory?.length ? 
+    mobyCoins: parseFloat(wallet.mobyCoins),
+    gamesPlayed: Array.isArray(gameHistory) ? gameHistory.length : 0,
+    winRate: Array.isArray(gameHistory) && gameHistory.length ? 
       Math.round((gameHistory.filter(g => g.isWin).length / gameHistory.length) * 100) : 0
   };
 
