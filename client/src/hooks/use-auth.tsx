@@ -46,11 +46,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  const { data: walletData } = useQuery({
+  const { data: walletData, error: walletError } = useQuery({
     queryKey: ["/api/wallet/" + user?.id],
     enabled: !!user?.id,
     refetchInterval: 5000, // Refresh wallet every 5 seconds
+    retry: 1,
   });
+
+  useEffect(() => {
+    if (walletError) {
+      // If fetching the wallet fails (e.g., 404), log the user out
+      logout();
+    }
+  }, [walletError]);
 
   useEffect(() => {
     if (
