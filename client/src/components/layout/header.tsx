@@ -3,6 +3,7 @@ import { useAuth } from "../../hooks/use-auth";
 import { Link, useLocation } from "wouter";
 import { Button } from "../ui/button";
 import { Fish, Home, Gamepad2, Wallet, User } from "lucide-react";
+import { ConnectWallet } from '../auth/connect-wallet';
 
 export default function Header() {
   const { user, wallet, isAuthenticated } = useAuth();
@@ -90,21 +91,7 @@ export default function Header() {
             </div>
 
             <div className="flex items-center space-x-4">
-              <div className="hidden md:block glass-card px-4 py-2 rounded-lg">
-                <span className="text-gold-500 font-semibold">
-                  {wallet ? parseFloat(wallet.coins).toLocaleString() : "0"}
-                </span>
-                <span className="text-gray-300 ml-1">Coins</span>
-              </div>
-              
-              <Link href="/profile">
-                <Button
-                  size="sm"
-                  className="w-10 h-10 bg-gradient-to-r from-gold-500 to-gold-600 rounded-full hover:animate-glow"
-                >
-                  <User className="h-4 w-4" />
-                </Button>
-              </Link>
+              <ConnectWallet />
             </div>
           </>
         )}

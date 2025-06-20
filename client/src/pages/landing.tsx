@@ -24,17 +24,6 @@ export default function Landing() {
     <div className="min-h-screen">
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center">
-        {/* Background with ocean waves */}
-        <div className="absolute inset-0 bg-gradient-to-br from-ocean-950 via-ocean-900 to-ocean-800"></div>
-        <div 
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage: "url('https://images.unsplash.com/photo-1559827260-dc66d52bef19?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=1080')",
-            backgroundSize: "cover",
-            backgroundPosition: "center"
-          }}
-        ></div>
-        
         <div className="relative z-10 text-center px-4 max-w-6xl mx-auto">
           <div className="animate-float mb-8">
             <div className="w-32 h-32 mx-auto whale-gradient rounded-full flex items-center justify-center mb-6 animate-glow">

@@ -14,8 +14,8 @@ export default {
         background: "var(--background)",
         foreground: "var(--foreground)",
         card: {
-          DEFAULT: "var(--card)",
-          foreground: "var(--card-foreground)",
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
         },
         popover: {
           DEFAULT: "var(--popover)",
@@ -61,6 +61,10 @@ export default {
           border: "var(--sidebar-border)",
           ring: "var(--sidebar-ring)",
         },
+        'dark-navy': '#1A1D2B',
+        'navy': '#2C3147',
+        'bright-blue': '#4A80FF',
+        'custom-dark': '#202434',
       },
       keyframes: {
         "accordion-down": {
