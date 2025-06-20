@@ -4,6 +4,7 @@ import { z } from "zod";
 import { insertUserSchema, insertGameResultSchema, insertDepositSchema, insertWithdrawalSchema } from "@shared/schema";
 import { storage } from "./storage.js";
 import crypto from "crypto";
+import { hashPassword, verifyPassword } from "./utils.js";
 
 const loginSchema = z.object({
   username: z.string().min(1),
@@ -39,7 +40,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email already exists" });
       }
 
-      const user = await storage.createUser(userData);
+      const hashedPassword = await hashPassword(userData.password);
+      const user = await storage.createUser({
+        ...userData,
+        password: hashedPassword,
+      });
+      
       const wallet = await storage.getWallet(user.id);
       
       res.json({ 
@@ -56,7 +62,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { username, password } = loginSchema.parse(req.body);
       
       const user = await storage.getUserByUsername(username);
-      if (!user || user.password !== password) {
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const isValidPassword = await verifyPassword(password, user.password);
+      if (!isValidPassword) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 

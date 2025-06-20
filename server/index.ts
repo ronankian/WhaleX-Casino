@@ -1,23 +1,13 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes.js";
 import { setupVite, serveStatic, log } from "./vite.js";
-import { connectToDatabase, closeDatabaseConnection } from './db/config.js';
+
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// MongoDB connection
-let db: any;
-(async () => {
-  try {
-    db = await connectToDatabase();
-    log('MongoDB connected successfully');
-  } catch (error: any) {
-    log('MongoDB connection error:', error.message);
-    process.exit(1);
-  }
-})();
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -78,8 +68,7 @@ app.use((req, res, next) => {
   });
 
   // Handle graceful shutdown
-  process.on('SIGINT', async () => {
-    await closeDatabaseConnection();
-    process.exit(0);
-  });
+   process.on('SIGINT', async () => {
+     process.exit(0);
+   });
 })();

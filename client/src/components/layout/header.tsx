@@ -1,100 +1,155 @@
-import React from 'react';
-import { useAuth } from "../../hooks/use-auth";
+import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Button } from "../ui/button";
-import { Fish, Home, Gamepad2, Wallet, User } from "lucide-react";
-import { ConnectWallet } from '../auth/connect-wallet';
+import {
+  ChevronDown, User as UserIcon, LogOut, Wallet, ArrowDownCircle, ArrowUpCircle, Menu,
+  Home, Fish, Info, Dice5, Crown, Bomb, BarChart3, Target, Circle, Gamepad2, TrendingDown, Gem, FerrisWheel
+} from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+
+const navItems = [
+  { name: "Casino", path: "/dashboard", icon: <Crown className="w-5 h-5 mr-2" /> },
+  { name: "Fish Farm", path: "/fish-farm", icon: <Fish className="w-5 h-5 mr-2" /> },
+  { name: "About", path: "/about", icon: <Info className="w-5 h-5 mr-2" /> },
+];
+
+const games = [
+  { name: "Crash", path: "/games/crash", icon: <TrendingDown className="w-5 h-5 mr-2" /> },
+  { name: "Dice", path: "/games/dice", icon: <Dice5 className="w-5 h-5 mr-2" /> },
+  { name: "Slot 777", path: "/games/slots", icon: <Gem className="w-5 h-5 mr-2" /> },
+  { name: "Hi-Lo", path: "/games/hilo", icon: <Target className="w-5 h-5 mr-2" /> },
+  { name: "Mines", path: "/games/mines", icon: <Bomb className="w-5 h-5 mr-2" /> },
+  { name: "Plinko", path: "/games/plinko", icon: <Circle className="w-5 h-5 mr-2" /> },
+  { name: "Roulette", path: "/games/roulette", icon: <FerrisWheel className="w-5 h-5 mr-2" /> },
+];
 
 export default function Header() {
-  const { user, wallet, isAuthenticated } = useAuth();
-  const [location] = useLocation();
+  const { user, wallet, logout } = useAuth();
+  const [location, setLocation] = useLocation();
+  const [navOpen, setNavOpen] = useState(false);
+  const [gamesOpen, setGamesOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
-  if (location === "/") {
-    return null; // Don't show header on landing page
-  }
+  const handleLogout = () => {
+    logout();
+    setLocation("/");
+  };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 glass-card border-b border-gold-500/20">
-      <nav className="container mx-auto px-4 py-4 flex items-center justify-between">
-        <Link href="/" className="flex items-center">
-          <img 
-            src="/images/brand.png" 
-            alt="WhaleX Casino"
-            className="h-12"
-          />
-        </Link>
-
-        {isAuthenticated && (
-          <>
-            <div className="hidden md:flex items-center space-x-6">
-              <Link href="/dashboard">
-                <Button
-                  variant="ghost"
-                  className={`text-white hover:text-gold-500 transition-colors ${
-                    location === "/dashboard" ? "text-gold-500" : ""
-                  }`}
-                >
-                  <Home className="mr-2 h-4 w-4" />
-                  Dashboard
-                </Button>
-              </Link>
-              
-              <div className="relative group">
-                <Button
-                  variant="ghost"
-                  className={`text-white hover:text-gold-500 transition-colors ${
-                    location.startsWith("/games") ? "text-gold-500" : ""
-                  }`}
-                >
-                  <Gamepad2 className="mr-2 h-4 w-4" />
-                  Games
-                </Button>
-                
-                {/* Games dropdown */}
-                <div className="absolute top-full left-0 mt-2 w-48 glass-card rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                  <div className="p-2">
-                    <Link href="/games/dice">
-                      <Button variant="ghost" className="w-full justify-start text-white hover:text-gold-500">
-                        🎲 Dice Roll
-                      </Button>
-                    </Link>
-                    <Link href="/games/slots">
-                      <Button variant="ghost" className="w-full justify-start text-white hover:text-gold-500">
-                        👑 Slot 777
-                      </Button>
-                    </Link>
-                    <Link href="/games/hilo">
-                      <Button variant="ghost" className="w-full justify-start text-white hover:text-gold-500">
-                        🃏 Hi-Lo
-                      </Button>
-                    </Link>
-                    <Link href="/games/crash">
-                      <Button variant="ghost" className="w-full justify-start text-white hover:text-gold-500">
-                        📈 Crash
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
+    <header className="fixed top-0 left-0 right-0 z-50 bg-black/70 border-b border-gold-500/20 backdrop-blur-md">
+      <nav className="container mx-auto px-4 py-3 flex items-center justify-between">
+        {/* Left Side: Logo, Nav, & Burger Menu */}
+        <div className="flex items-center gap-8">
+          <div className="lg:hidden relative">
+            <button
+              className="text-white p-2 rounded hover:bg-black/30 focus:outline-none"
+              aria-label="Open menu"
+              onClick={() => setNavOpen((v) => !v)}
+            >
+              <Menu className="w-7 h-7" />
+            </button>
+            {navOpen && (
+              <div className="absolute left-0 mt-2 w-56 max-h-[80vh] overflow-y-auto bg-black/95 rounded-xl shadow-2xl py-2 z-50 border border-gold-500/20 flex flex-col animate-fade-in">
+                {navItems.map((item) => (
+                  <Link href={item.path} key={item.name} className={`flex items-center px-4 py-3 text-white hover:bg-gold-500/10 hover:text-gold-400 transition-colors ${location === item.path ? "bg-gold-500/10 text-gold-400" : ""}`} onClick={() => setNavOpen(false)}>
+                    {item.icon}
+                    {item.name}
+                  </Link>
+                ))}
+                <div className="border-t border-gold-500/20 my-2" />
+                {games.map((game) => (
+                  <Link href={game.path} key={game.name} className="flex items-center px-4 py-3 text-white hover:bg-gold-500/10 hover:text-gold-400 transition-colors" onClick={() => setNavOpen(false)}>
+                    {game.icon}
+                    {game.name}
+                  </Link>
+                ))}
               </div>
-              
-              <Link href="/wallet">
-                <Button
-                  variant="ghost"
-                  className={`text-white hover:text-gold-500 transition-colors ${
-                    location === "/wallet" ? "text-gold-500" : ""
-                  }`}
-                >
-                  <Wallet className="mr-2 h-4 w-4" />
-                  Wallet
-                </Button>
+            )}
+          </div>
+          <Link href="/dashboard" className="ms-1 flex-shrink-0">
+            <img src="/images/brand.png" alt="WhaleX Casino" className="h-10" />
+          </Link>
+          <div className="hidden lg:flex items-center gap-8">
+            {navItems.map((item) => (
+              <Link
+                href={item.path}
+                key={item.name}
+                className={`flex items-center font-semibold text-white hover:text-gold-400 transition-colors ${location === item.path ? "text-gold-400" : ""}`}
+              >
+                {item.icon}
+                {item.name}
               </Link>
+            ))}
+            <div className="relative">
+              <button
+                className="font-semibold text-white hover:text-gold-400 transition-colors flex items-center gap-1 focus:outline-none"
+                onClick={() => setGamesOpen((v) => !v)}
+                onBlur={() => setTimeout(() => setGamesOpen(false), 150)}
+              >
+                <Gamepad2 className="w-5 h-5 mr-2" /> Games <ChevronDown className="w-4 h-4 ml-1" />
+              </button>
+              {gamesOpen && (
+                <div className="absolute left-0 mt-2 w-48 bg-black/95 rounded-xl shadow-2xl py-2 z-50 border border-gold-500/20 flex flex-col animate-fade-in">
+                  {games.map((game) => (
+                    <Link
+                      href={game.path}
+                      key={game.name}
+                      className="flex items-center px-4 py-3 text-white hover:bg-gold-500/10 hover:text-gold-400 transition-colors"
+                      onClick={() => setGamesOpen(false)}
+                    >
+                      {game.icon}
+                      {game.name}
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
+          </div>
+        </div>
 
-            <div className="flex items-center space-x-4">
-              <ConnectWallet />
-            </div>
-          </>
-        )}
+        {/* Right Side: Balances and User */}
+        <div className="flex items-center gap-4 md:gap-6">
+          <div className="flex items-center gap-2 bg-black/40 px-3 py-1 rounded-lg">
+            <img src="/images/coin.png" alt="WhaleX Coin" className="w-6 h-6" />
+            <span className="text-white font-semibold">{wallet ? parseFloat(wallet.coins).toLocaleString() : "0"}</span>
+          </div>
+          <div className="flex items-center gap-2 bg-black/40 px-3 py-1 rounded-lg">
+            <img src="/images/$MOBY.png" alt="$MOBY Token" className="w-6 h-6" />
+            <span className="text-cyan-300 font-semibold">{wallet ? parseFloat(wallet.mobyTokens).toLocaleString() : "0"}</span>
+          </div>
+          <div className="relative">
+            <button
+              className="flex items-center gap-2 bg-black/40 px-3 py-1 rounded-lg text-white font-semibold hover:text-gold-400 focus:outline-none"
+              onClick={() => setProfileOpen((v) => !v)}
+              onBlur={() => setTimeout(() => setProfileOpen(false), 150)}
+            >
+              <UserIcon className="w-5 h-5" />
+              <span>{user?.username || "User"}</span>
+              <ChevronDown className="w-4 h-4" />
+            </button>
+            {profileOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-black/90 rounded-lg shadow-lg py-2 z-50 border border-gold-500/20">
+                <Link href="/profile" className="flex items-center gap-2 px-4 py-2 text-white hover:bg-gold-500/10 hover:text-gold-400 transition-colors">
+                  <UserIcon className="w-4 h-4" /> Profile
+                </Link>
+                <Link href="/wallet" className="flex items-center gap-2 px-4 py-2 text-white hover:bg-gold-500/10 hover:text-gold-400 transition-colors">
+                  <Wallet className="w-4 h-4" /> Wallet
+                </Link>
+                <Link href="/deposit" className="flex items-center gap-2 px-4 py-2 text-white hover:bg-gold-500/10 hover:text-gold-400 transition-colors">
+                  <ArrowDownCircle className="w-4 h-4" /> Deposit
+                </Link>
+                <Link href="/withdraw" className="flex items-center gap-2 px-4 py-2 text-white hover:bg-gold-500/10 hover:text-gold-400 transition-colors">
+                  <ArrowUpCircle className="w-4 h-4" /> Withdraw
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-4 py-2 w-full text-left text-red-400 hover:bg-red-500/10 hover:text-red-500 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" /> Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </nav>
     </header>
   );

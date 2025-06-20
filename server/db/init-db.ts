@@ -1,84 +1,37 @@
-import { connectToDatabase, closeDatabaseConnection } from './config.js';
-import { Db } from 'mongodb';
+import "dotenv/config";
+import { drizzle } from "drizzle-orm/neon-http";
+import { neon } from "@neondatabase/serverless";
+import * as schema from "@shared/schema";
+import { hashPassword } from "../utils";
 
-async function createCollections(db: Db) {
-    try {
-        // Users Collection
-        await db.createCollection('users');
-        await db.collection('users').createIndex({ username: 1 }, { unique: true });
-        await db.collection('users').createIndex({ email: 1 }, { unique: true });
-        console.log('✅ Users collection created with indexes');
+async function main() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is not set");
+  }
 
-        // Wallets Collection
-        await db.createCollection('wallets');
-        await db.collection('wallets').createIndex({ userId: 1 }, { unique: true });
-        console.log('✅ Wallets collection created with indexes');
+  const sql = neon(process.env.DATABASE_URL);
+  const db = drizzle(sql, { schema });
 
-        // Game History Collection
-        await db.createCollection('gameHistory');
-        await db.collection('gameHistory').createIndex({ userId: 1 });
-        await db.collection('gameHistory').createIndex({ createdAt: 1 });
-        console.log('✅ Game History collection created with indexes');
+  console.log("Seeding database...");
 
-        // Transactions Collection
-        await db.createCollection('transactions');
-        await db.collection('transactions').createIndex({ userId: 1 });
-        await db.collection('transactions').createIndex({ createdAt: 1 });
-        console.log('✅ Transactions collection created with indexes');
+  // Delete all existing data
+  await db.delete(schema.users);
 
-        // Game Sessions Collection
-        await db.createCollection('gameSessions');
-        await db.collection('gameSessions').createIndex({ userId: 1 });
-        await db.collection('gameSessions').createIndex({ status: 1 });
-        console.log('✅ Game Sessions collection created with indexes');
+  const hashedPassword = await hashPassword("admin1234");
 
-    } catch (error: any) {
-        console.error('Error creating collections:', error.message);
-        throw error;
-    }
+  await db.insert(schema.users).values({
+    username: "admin",
+    email: "admin@whalex.com",
+    password: hashedPassword,
+    role: "admin",
+    isActive: true,
+    level: 99
+  });
+
+  console.log("Database seeded successfully!");
 }
 
-async function initializeDatabase() {
-    let db;
-    try {
-        db = await connectToDatabase();
-        console.log('Connected to MongoDB');
-
-        // Check if collections already exist
-        const collections = await db.listCollections().toArray();
-        if (collections.length > 0) {
-            console.log('\nExisting collections found:');
-            collections.forEach(collection => {
-                console.log(`- ${collection.name}`);
-            });
-            
-            const proceed = process.argv.includes('--force');
-            if (!proceed) {
-                console.log('\n⚠️ Collections already exist. To recreate them, run with --force flag');
-                return;
-            }
-            
-            // Drop existing collections if --force flag is used
-            for (const collection of collections) {
-                await db.dropCollection(collection.name);
-                console.log(`Dropped collection: ${collection.name}`);
-            }
-        }
-
-        // Create collections
-        await createCollections(db);
-        console.log('\n✅ All collections created successfully!');
-
-    } catch (error: any) {
-        console.error('❌ Database initialization failed:', error.message);
+main().catch((err) => {
+  console.error("Error seeding database:", err);
         process.exit(1);
-    } finally {
-        if (db) {
-            await closeDatabaseConnection();
-            console.log('\nDatabase connection closed');
-        }
-    }
-}
-
-// Run the initialization
-initializeDatabase(); 
+});

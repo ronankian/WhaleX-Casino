@@ -18,6 +18,7 @@ import {
   Target
 } from "lucide-react";
 import { formatCurrency, formatMoby } from "@/lib/game-utils";
+import GameLayout from "@/components/games/game-layout";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -172,29 +173,7 @@ export default function Dashboard() {
         {/* Featured Games */}
         <div className="mb-12">
           <h3 className="text-2xl font-display font-bold text-white mb-6">Featured Games</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {games.map((game) => {
-              const IconComponent = game.icon;
-              return (
-                <Card
-                  key={game.id}
-                  className="glass-card border-gold-500/20 hover:bg-white/20 transition-all duration-300 cursor-pointer group"
-                  onClick={() => setLocation(game.path)}
-                >
-                  <CardContent className="p-6">
-                    <div className={`w-full h-32 bg-gradient-to-r ${game.color} rounded-lg mb-4 flex items-center justify-center group-hover:animate-glow`}>
-                      <IconComponent className="h-12 w-12 text-white animate-float" />
-                    </div>
-                    <h4 className="text-lg font-semibold mb-2 text-white">{game.name}</h4>
-                    <p className="text-gray-400 text-sm mb-4">{game.description}</p>
-                    <Button className="w-full bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-white font-semibold">
-                      Play Now
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+          <GameLayout />
         </div>
 
         {/* Recent Activity */}
@@ -219,24 +198,17 @@ export default function Dashboard() {
                       </div>
                       <div>
                         <p className="font-medium text-white">
-                          {game.isWin ? "Won" : "Lost"} {game.gameType.charAt(0).toUpperCase() + game.gameType.slice(1)}
+                          Played {game.gameName}
                         </p>
                         <p className="text-sm text-gray-400">
-                          {new Date(game.createdAt).toLocaleString()}
+                          {new Date(game.timestamp).toLocaleString()}
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className={`font-semibold ${
-                        game.isWin ? "text-green-400" : "text-red-400"
-                      }`}>
-                        {game.isWin ? "+" : "-"}{formatCurrency(game.betAmount)} Coins
-                      </span>
-                      {parseFloat(game.mobyReward) > 0 && (
-                        <p className="text-xs text-ocean-400">
-                          +{formatMoby(game.mobyReward)} $MOBY
-                        </p>
-                      )}
+                    <div className={`text-lg font-bold ${
+                      game.isWin ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {game.isWin ? '+' : '-'} {formatCurrency(game.payout - game.betAmount)}
                     </div>
                   </div>
                 ))}

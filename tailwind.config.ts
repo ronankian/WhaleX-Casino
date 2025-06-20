@@ -10,6 +10,9 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      screens: {
+        // Use Tailwind's default breakpoints (md: 768px, lg: 1024px)
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",

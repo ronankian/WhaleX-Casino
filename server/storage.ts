@@ -1,9 +1,19 @@
-import { 
+import { drizzle } from "drizzle-orm/neon-http";
+import { neon } from "@neondatabase/serverless";
+import { eq, desc } from "drizzle-orm";
+import {
   users, wallets, gameResults, deposits, withdrawals,
   type User, type InsertUser, type Wallet, type InsertWallet,
   type GameResult, type InsertGameResult, type Deposit, type InsertDeposit,
   type Withdrawal, type InsertWithdrawal
 } from "@shared/schema";
+
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is not set");
+}
+
+const sql = neon(process.env.DATABASE_URL);
+const db = drizzle(sql);
 
 export interface IStorage {
   // User operations
@@ -33,207 +43,103 @@ export interface IStorage {
   updateWithdrawal(id: number, updates: Partial<Withdrawal>): Promise<Withdrawal | undefined>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User> = new Map();
-  private wallets: Map<number, Wallet> = new Map();
-  private gameResults: Map<number, GameResult> = new Map();
-  private deposits: Map<number, Deposit> = new Map();
-  private withdrawals: Map<number, Withdrawal> = new Map();
-  
-  private currentUserId = 1;
-  private currentWalletId = 1;
-  private currentGameResultId = 1;
-  private currentDepositId = 1;
-  private currentWithdrawalId = 1;
-
-  constructor() {
-    // Create admin user
-    this.createUser({
-      username: "admin",
-      email: "admin@whalex.com",
-      password: "admin1234",
-      role: "admin",
-      isActive: true,
-      level: 99
-    });
-
-    // Create demo player
-    this.createUser({
-      username: "player123",
-      email: "player123@email.com", 
-      password: "password123",
-      role: "player",
-      isActive: true,
-      level: 5
-    });
-  }
-
+export class DbStorage implements IStorage {
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const result = await db.select().from(users).where(eq(users.id, id));
+    return result[0];
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.username === username);
+    const result = await db.select().from(users).where(eq(users.username, username));
+    return result[0];
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.email === email);
+    const result = await db.select().from(users).where(eq(users.email, email));
+    return result[0];
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = {
-      id,
-      username: insertUser.username,
-      email: insertUser.email,
-      password: insertUser.password,
-      role: insertUser.role || "player",
-      isActive: insertUser.isActive ?? true,
-      level: insertUser.level || 1,
-      joinDate: new Date()
-    };
-    this.users.set(id, user);
+    const newUser = await db.insert(users).values(insertUser).returning();
     
     // Create wallet for new user
-    await this.createWallet({ userId: id });
+    await this.createWallet({ userId: newUser[0].id });
     
-    return user;
+    return newUser[0];
   }
 
   async updateUser(id: number, updates: Partial<User>): Promise<User | undefined> {
-    const user = this.users.get(id);
-    if (!user) return undefined;
-    
-    const updatedUser = { ...user, ...updates };
-    this.users.set(id, updatedUser);
-    return updatedUser;
+    const result = await db.update(users).set(updates).where(eq(users.id, id)).returning();
+    return result[0];
   }
 
   async getWallet(userId: number): Promise<Wallet | undefined> {
-    return Array.from(this.wallets.values()).find(wallet => wallet.userId === userId);
+    const result = await db.select().from(wallets).where(eq(wallets.userId, userId));
+    return result[0];
   }
 
   async createWallet(insertWallet: InsertWallet): Promise<Wallet> {
-    const id = this.currentWalletId++;
-    const wallet: Wallet = {
-      id,
+    const result = await db.insert(wallets).values({
       ...insertWallet,
-      coins: insertWallet.coins || "1000.00",
-      mobyTokens: insertWallet.mobyTokens || "0.0000",
-      mobyCoins: insertWallet.mobyCoins || "0.00"
-    };
-    this.wallets.set(id, wallet);
-    return wallet;
+      coins: "1000.00",
+      mobyTokens: "0.0000",
+      mobyCoins: "0.00"
+    }).returning();
+    return result[0];
   }
 
   async updateWallet(userId: number, updates: Partial<Wallet>): Promise<Wallet | undefined> {
-    const wallet = Array.from(this.wallets.values()).find(w => w.userId === userId);
-    if (!wallet) return undefined;
-    
-    const updatedWallet = { ...wallet, ...updates };
-    this.wallets.set(wallet.id, updatedWallet);
-    return updatedWallet;
+    const result = await db.update(wallets).set(updates).where(eq(wallets.userId, userId)).returning();
+    return result[0];
   }
 
   async createGameResult(insertResult: InsertGameResult): Promise<GameResult> {
-    const id = this.currentGameResultId++;
-    const result: GameResult = {
-      id,
-      userId: insertResult.userId,
-      gameId: insertResult.gameId,
-      gameType: insertResult.gameType,
-      betAmount: insertResult.betAmount,
-      payout: insertResult.payout || "0",
-      multiplier: insertResult.multiplier || null,
-      result: insertResult.result || null,
-      isWin: insertResult.isWin || false,
-      mobyReward: insertResult.mobyReward || null,
-      serverSeed: insertResult.serverSeed,
-      clientSeed: insertResult.clientSeed,
-      nonce: insertResult.nonce,
-      createdAt: new Date()
-    };
-    this.gameResults.set(id, result);
-    return result;
+    const result = await db.insert(gameResults).values(insertResult).returning();
+    return result[0];
   }
 
   async getGameResults(userId: number, limit = 10): Promise<GameResult[]> {
-    return Array.from(this.gameResults.values())
-      .filter(result => result.userId === userId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      .slice(0, limit);
+    return db.select().from(gameResults)
+      .where(eq(gameResults.userId, userId))
+      .orderBy(desc(gameResults.createdAt))
+      .limit(limit);
   }
 
   async createDeposit(insertDeposit: InsertDeposit): Promise<Deposit> {
-    const id = this.currentDepositId++;
-    const deposit: Deposit = {
-      id,
-      status: insertDeposit.status || "pending",
-      userId: insertDeposit.userId,
-      amount: insertDeposit.amount,
-      paymentMethod: insertDeposit.paymentMethod,
-      receiptUrl: insertDeposit.receiptUrl || null,
-      createdAt: new Date(),
-      processedAt: null
-    };
-    this.deposits.set(id, deposit);
-    return deposit;
+    const result = await db.insert(deposits).values(insertDeposit).returning();
+    return result[0];
   }
 
   async getDeposits(userId?: number): Promise<Deposit[]> {
-    let deposits = Array.from(this.deposits.values());
+    const query = db.select().from(deposits).orderBy(desc(deposits.createdAt));
     if (userId) {
-      deposits = deposits.filter(deposit => deposit.userId === userId);
+      return query.where(eq(deposits.userId, userId));
     }
-    return deposits.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return query;
   }
 
   async updateDeposit(id: number, updates: Partial<Deposit>): Promise<Deposit | undefined> {
-    const deposit = this.deposits.get(id);
-    if (!deposit) return undefined;
-    
-    const updatedDeposit = { ...deposit, ...updates };
-    if (updates.status && updates.status !== "pending") {
-      updatedDeposit.processedAt = new Date();
-    }
-    this.deposits.set(id, updatedDeposit);
-    return updatedDeposit;
+    const result = await db.update(deposits).set(updates).where(eq(deposits.id, id)).returning();
+    return result[0];
   }
 
   async createWithdrawal(insertWithdrawal: InsertWithdrawal): Promise<Withdrawal> {
-    const id = this.currentWithdrawalId++;
-    const withdrawal: Withdrawal = {
-      id,
-      status: insertWithdrawal.status || "pending",
-      userId: insertWithdrawal.userId,
-      amount: insertWithdrawal.amount,
-      currency: insertWithdrawal.currency,
-      createdAt: new Date(),
-      processedAt: null
-    };
-    this.withdrawals.set(id, withdrawal);
-    return withdrawal;
+    const result = await db.insert(withdrawals).values(insertWithdrawal).returning();
+    return result[0];
   }
 
   async getWithdrawals(userId?: number): Promise<Withdrawal[]> {
-    let withdrawals = Array.from(this.withdrawals.values());
+    const query = db.select().from(withdrawals).orderBy(desc(withdrawals.createdAt));
     if (userId) {
-      withdrawals = withdrawals.filter(withdrawal => withdrawal.userId === userId);
+      return query.where(eq(withdrawals.userId, userId));
     }
-    return withdrawals.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return query;
   }
 
   async updateWithdrawal(id: number, updates: Partial<Withdrawal>): Promise<Withdrawal | undefined> {
-    const withdrawal = this.withdrawals.get(id);
-    if (!withdrawal) return undefined;
-    
-    const updatedWithdrawal = { ...withdrawal, ...updates };
-    if (updates.status && updates.status !== "pending") {
-      updatedWithdrawal.processedAt = new Date();
-    }
-    this.withdrawals.set(id, updatedWithdrawal);
-    return updatedWithdrawal;
+    const result = await db.update(withdrawals).set(updates).where(eq(withdrawals.id, id)).returning();
+    return result[0];
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DbStorage();
