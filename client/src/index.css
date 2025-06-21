@@ -79,7 +79,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: theme('fontFamily.sans');
   }
 }
 
@@ -121,8 +121,31 @@
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-20px); }
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shake-and-glow {
+  0%, 100% {
+    transform: translateX(0);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-2px);
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(2px);
+    box-shadow: 0 0 25px rgba(255, 215, 0, 0.6);
+  }
+}
+
+.float {
+  animation: float 3s ease-in-out infinite;
 }
 
 @keyframes glow {
@@ -203,4 +226,332 @@
 .crash-area {
   fill: url(#crashGradient);
   opacity: 0.3;
+}
+
+/* Cloud drift animations for scattered clouds */
+@keyframes cloudDrift1 {
+  0% {
+    transform: translateX(0px) translateY(0px);
+    opacity: 0.7;
+  }
+  25% {
+    transform: translateX(10px) translateY(-5px);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateX(-5px) translateY(8px);
+    opacity: 0.8;
+  }
+  75% {
+    transform: translateX(8px) translateY(-3px);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateX(0px) translateY(0px);
+    opacity: 0.7;
+  }
+}
+
+@keyframes cloudDrift2 {
+  0% {
+    transform: translateX(0px) translateY(0px);
+    opacity: 0.6;
+  }
+  33% {
+    transform: translateX(-8px) translateY(6px);
+    opacity: 0.8;
+  }
+  66% {
+    transform: translateX(12px) translateY(-4px);
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateX(0px) translateY(0px);
+    opacity: 0.6;
+  }
+}
+
+@keyframes cloudDrift3 {
+  0% {
+    transform: translateX(0px) translateY(0px);
+    opacity: 0.5;
+  }
+  20% {
+    transform: translateX(6px) translateY(10px);
+    opacity: 0.7;
+  }
+  40% {
+    transform: translateX(-10px) translateY(-2px);
+    opacity: 0.9;
+  }
+  60% {
+    transform: translateX(4px) translateY(7px);
+    opacity: 0.3;
+  }
+  80% {
+    transform: translateX(-6px) translateY(-5px);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(0px) translateY(0px);
+    opacity: 0.5;
+  }
+}
+
+/* Downward falling cloud animations for when rocket launches */
+@keyframes cloudFallDown1 {
+  0% {
+    transform: translateY(0px);
+    opacity: 0.7;
+  }
+  25% {
+    transform: translateY(50px);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateY(100px);
+    opacity: 0.8;
+  }
+  75% {
+    transform: translateY(150px);
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateY(200px);
+    opacity: 0.1;
+  }
+}
+
+@keyframes cloudFallDown2 {
+  0% {
+    transform: translateY(0px) translateX(0px);
+    opacity: 0.6;
+  }
+  30% {
+    transform: translateY(60px) translateX(-10px);
+    opacity: 0.8;
+  }
+  60% {
+    transform: translateY(120px) translateX(8px);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(180px) translateX(-5px);
+    opacity: 0.1;
+  }
+}
+
+@keyframes cloudFallDown3 {
+  0% {
+    transform: translateY(0px) translateX(0px);
+    opacity: 0.5;
+  }
+  20% {
+    transform: translateY(40px) translateX(8px);
+    opacity: 0.7;
+  }
+  40% {
+    transform: translateY(80px) translateX(-6px);
+    opacity: 0.9;
+  }
+  70% {
+    transform: translateY(140px) translateX(4px);
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateY(190px) translateX(-3px);
+    opacity: 0.1;
+  }
+}
+
+/* Text visibility improvements */
+.crash-text-shadow {
+  text-shadow: 
+    2px 2px 4px rgba(0, 0, 0, 0.8),
+    -1px -1px 2px rgba(0, 0, 0, 0.6),
+    1px -1px 2px rgba(0, 0, 0, 0.6),
+    -1px 1px 2px rgba(0, 0, 0, 0.6),
+    0 0 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Neon Jackpot Styles */
+.jackpot-container {
+  position: fixed;
+  top: 120px;
+  right: 20px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.jackpot-glow {
+  filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.6))
+          drop-shadow(0 0 20px rgba(255, 215, 0, 0.4))
+          drop-shadow(0 0 30px rgba(255, 215, 0, 0.3));
+  animation: jackpotPulse 3s ease-in-out infinite;
+}
+
+.jackpot-text-neon {
+  text-shadow: 
+    0 0 5px rgba(255, 215, 0, 0.8),
+    0 0 10px rgba(255, 215, 0, 0.6),
+    0 0 15px rgba(255, 215, 0, 0.4),
+    0 0 20px rgba(255, 215, 0, 0.3);
+  animation: textNeonGlow 2.5s ease-in-out infinite alternate;
+}
+
+.jackpot-text-neon-enhanced {
+  text-shadow: 
+    0 0 8px rgba(255, 215, 0, 1),
+    0 0 16px rgba(255, 215, 0, 0.8),
+    0 0 24px rgba(255, 215, 0, 0.6),
+    0 0 32px rgba(255, 215, 0, 0.4),
+    2px 2px 4px rgba(0, 0, 0, 0.9);
+  animation: textNeonGlowEnhanced 2s ease-in-out infinite alternate;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.jackpot-text-neon-white {
+  text-shadow: 
+    0 0 8px rgba(255, 255, 255, 1),
+    0 0 16px rgba(255, 255, 255, 0.8),
+    0 0 24px rgba(255, 255, 255, 0.6),
+    0 0 32px rgba(255, 215, 0, 0.4),
+    2px 2px 4px rgba(0, 0, 0, 0.9);
+  animation: textNeonGlowWhite 2s ease-in-out infinite alternate;
+}
+
+.jackpot-amount-neon {
+  text-shadow: 
+    0 0 3px rgba(255, 255, 255, 0.9),
+    0 0 8px rgba(255, 215, 0, 0.8),
+    0 0 12px rgba(255, 215, 0, 0.6),
+    0 0 16px rgba(255, 215, 0, 0.4),
+    2px 2px 4px rgba(0, 0, 0, 0.8);
+  animation: amountNeonGlow 2s ease-in-out infinite alternate;
+}
+
+.treasure-chest-glow {
+  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.5))
+          drop-shadow(0 0 16px rgba(255, 215, 0, 0.3));
+  animation: chestFloat 4s ease-in-out infinite;
+}
+
+.moby-token-glow {
+  filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.6))
+          drop-shadow(0 0 12px rgba(255, 215, 0, 0.4));
+}
+
+@keyframes jackpotPulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.6))
+            drop-shadow(0 0 20px rgba(255, 215, 0, 0.4))
+            drop-shadow(0 0 30px rgba(255, 215, 0, 0.3));
+  }
+  50% {
+    transform: scale(1.02);
+    filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.8))
+            drop-shadow(0 0 25px rgba(255, 215, 0, 0.6))
+            drop-shadow(0 0 35px rgba(255, 215, 0, 0.4));
+  }
+}
+
+@keyframes textNeonGlow {
+  from {
+    text-shadow: 
+      0 0 5px rgba(255, 215, 0, 0.8),
+      0 0 10px rgba(255, 215, 0, 0.6),
+      0 0 15px rgba(255, 215, 0, 0.4),
+      0 0 20px rgba(255, 215, 0, 0.3);
+  }
+  to {
+    text-shadow: 
+      0 0 8px rgba(255, 215, 0, 1),
+      0 0 15px rgba(255, 215, 0, 0.8),
+      0 0 20px rgba(255, 215, 0, 0.6),
+      0 0 25px rgba(255, 215, 0, 0.4);
+  }
+}
+
+@keyframes amountNeonGlow {
+  from {
+    text-shadow: 
+      0 0 3px rgba(255, 255, 255, 0.9),
+      0 0 8px rgba(255, 215, 0, 0.8),
+      0 0 12px rgba(255, 215, 0, 0.6),
+      0 0 16px rgba(255, 215, 0, 0.4),
+      2px 2px 4px rgba(0, 0, 0, 0.8);
+  }
+  to {
+    text-shadow: 
+      0 0 5px rgba(255, 255, 255, 1),
+      0 0 12px rgba(255, 215, 0, 1),
+      0 0 18px rgba(255, 215, 0, 0.8),
+      0 0 24px rgba(255, 215, 0, 0.6),
+      2px 2px 6px rgba(0, 0, 0, 0.9);
+  }
+}
+
+@keyframes chestFloat {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-3px) rotate(1deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-2px) rotate(-1deg);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .jackpot-container {
+    top: 100px;
+    right: 15px;
+    transform: scale(0.85);
+  }
+}
+
+@keyframes textNeonGlowEnhanced {
+  from {
+    text-shadow: 
+      0 0 8px rgba(255, 215, 0, 1),
+      0 0 16px rgba(255, 215, 0, 0.8),
+      0 0 24px rgba(255, 215, 0, 0.6),
+      0 0 32px rgba(255, 215, 0, 0.4),
+      2px 2px 4px rgba(0, 0, 0, 0.9);
+    border-color: rgba(255, 215, 0, 0.3);
+  }
+  to {
+    text-shadow: 
+      0 0 12px rgba(255, 215, 0, 1),
+      0 0 20px rgba(255, 215, 0, 0.9),
+      0 0 28px rgba(255, 215, 0, 0.7),
+      0 0 36px rgba(255, 215, 0, 0.5),
+      2px 2px 6px rgba(0, 0, 0, 1);
+    border-color: rgba(255, 215, 0, 0.5);
+  }
+}
+
+@keyframes textNeonGlowWhite {
+  from {
+    text-shadow: 
+      0 0 8px rgba(255, 255, 255, 1),
+      0 0 16px rgba(255, 255, 255, 0.8),
+      0 0 24px rgba(255, 255, 255, 0.6),
+      0 0 32px rgba(255, 215, 0, 0.4),
+      2px 2px 4px rgba(0, 0, 0, 0.9);
+  }
+  to {
+    text-shadow: 
+      0 0 12px rgba(255, 255, 255, 1),
+      0 0 20px rgba(255, 255, 255, 0.9),
+      0 0 28px rgba(255, 255, 255, 0.7),
+      0 0 36px rgba(255, 215, 0, 0.5),
+      2px 2px 6px rgba(0, 0, 0, 1);
+  }
 }

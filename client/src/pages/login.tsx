@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 
 const bgUrl = "/images/bg.png";
 const logoUrl = "/images/brand.png";
@@ -10,26 +11,34 @@ const brandColorHover = "#1de9b6";
 export default function Login() {
   const [, setLocation] = useLocation();
   const { login, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
-      setLocation("/dashboard");
+      setLocation("/home");
     }
   }, [isAuthenticated, setLocation]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
     try {
       await login(username, password);
+      toast({
+        title: "Success!",
+        description: "You have successfully logged in.",
+        className: "bg-black/90 border-zinc-700 text-white",
+      });
       // No direct setLocation here; redirect will happen in useEffect
     } catch (err: any) {
-      setError(err?.message || "Login failed. Please try again.");
+      toast({
+        title: "Login Failed",
+        description: err?.message || "Invalid credentials. Please try again.",
+        className: "bg-black/90 border-red-500 text-white",
+      });
     } finally {
       setLoading(false);
     }
@@ -72,7 +81,6 @@ export default function Login() {
           value={password}
           onChange={e => setPassword(e.target.value)}
         />
-        {error && <div className="text-red-400 mb-4">{error}</div>}
         <button
           type="submit"
           style={{ backgroundColor: brandColor, color: "#18181b" }}

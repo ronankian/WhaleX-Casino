@@ -2,10 +2,10 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import { eq, desc } from "drizzle-orm";
 import {
-  users, wallets, gameResults, deposits, withdrawals,
+  users, wallets, gameResults, deposits, withdrawals, jackpot,
   type User, type InsertUser, type Wallet, type InsertWallet,
   type GameResult, type InsertGameResult, type Deposit, type InsertDeposit,
-  type Withdrawal, type InsertWithdrawal
+  type Withdrawal, type InsertWithdrawal, type Jackpot, type InsertJackpot
 } from "@shared/schema";
 
 if (!process.env.DATABASE_URL) {
@@ -31,6 +31,11 @@ export interface IStorage {
   // Game operations
   createGameResult(result: InsertGameResult): Promise<GameResult>;
   getGameResults(userId: number, limit?: number): Promise<GameResult[]>;
+  
+  // Jackpot operations
+  getJackpot(): Promise<Jackpot | undefined>;
+  updateJackpot(updates: Partial<Jackpot>): Promise<Jackpot | undefined>;
+  addToJackpot(amount: number): Promise<Jackpot | undefined>;
   
   // Deposit operations
   createDeposit(deposit: InsertDeposit): Promise<Deposit>;
@@ -139,6 +144,37 @@ export class DbStorage implements IStorage {
   async updateWithdrawal(id: number, updates: Partial<Withdrawal>): Promise<Withdrawal | undefined> {
     const result = await db.update(withdrawals).set(updates).where(eq(withdrawals.id, id)).returning();
     return result[0];
+  }
+
+  async getJackpot(): Promise<Jackpot | undefined> {
+    const result = await db.select().from(jackpot).limit(1);
+    if (result.length === 0) {
+      // Initialize jackpot if it doesn't exist
+      const newJackpot = await db.insert(jackpot).values({
+        totalPool: "0.0000"
+      }).returning();
+      return newJackpot[0];
+    }
+    return result[0];
+  }
+
+  async updateJackpot(updates: Partial<Jackpot>): Promise<Jackpot | undefined> {
+    const currentJackpot = await this.getJackpot();
+    if (!currentJackpot) return undefined;
+    
+    const result = await db.update(jackpot)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(jackpot.id, currentJackpot.id))
+      .returning();
+    return result[0];
+  }
+
+  async addToJackpot(amount: number): Promise<Jackpot | undefined> {
+    const currentJackpot = await this.getJackpot();
+    if (!currentJackpot) return undefined;
+    
+    const newTotal = parseFloat(currentJackpot.totalPool) + amount;
+    return this.updateJackpot({ totalPool: newTotal.toFixed(4) });
   }
 }
 

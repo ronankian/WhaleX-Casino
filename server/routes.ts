@@ -285,9 +285,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         case "crash":
           const crashPoint = generateCrashPoint(serverSeed, clientSeed, nonce);
-          const cashOutPoint = gameData.cashOut || 1.0;
+          const cashOutPoint = gameData.cashOut !== undefined ? gameData.cashOut : 1.0;
           
-          isWin = cashOutPoint <= crashPoint;
+          // If cashOut is 0, it means the game crashed before cash out (loss)
+          isWin = cashOutPoint > 0 && cashOutPoint <= crashPoint;
           multiplier = isWin ? cashOutPoint : 0;
           result = { crashPoint, cashOut: cashOutPoint };
           break;
@@ -297,12 +298,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 0-10% chance to win MOBY tokens
       if (isWin && Math.random() < 0.1) {
-        mobyReward = betAmount * 0.001; // Small MOBY reward
+        mobyReward = betAmount * 0.0002; // 1 coin = 0.0002 MOBY (1/5000)
       }
 
       // Update wallet
       const newBalance = balance - betAmount + payout;
       const newMobyBalance = parseFloat(wallet.mobyTokens) + mobyReward;
+      
+      // Add lost bet amount to jackpot (convert coins to MOBY tokens)
+      if (!isWin && betAmount > 0) {
+        const jackpotContribution = betAmount * 0.0002; // 1 coin = 0.0002 MOBY (1/5000)
+        await storage.addToJackpot(jackpotContribution);
+      }
       
       await storage.updateWallet(userId, {
         coins: newBalance.toFixed(2),
@@ -387,6 +394,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(withdrawals);
     } catch (error) {
       res.status(400).json({ message: "Invalid user ID" });
+    }
+  });
+
+  // Jackpot routes
+  app.get("/api/jackpot", async (req, res) => {
+    try {
+      const jackpotData = await storage.getJackpot();
+      res.json(jackpotData);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get jackpot" });
     }
   });
 

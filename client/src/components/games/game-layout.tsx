@@ -1,8 +1,8 @@
-import { ReactNode } from "react";
-import { Button } from "@/components/ui/button";
+import React, { ReactNode } from "react";
+import { Button } from "../ui/button";
 import { ArrowLeft, User } from "lucide-react";
 import { Link } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
+import FloatingJackpot from "../ui/floating-jackpot";
 
 interface GameLayoutProps {
   title: string;
@@ -63,13 +63,15 @@ const games = [
 ];
 
 export default function GameLayout({ title, description, children }: GameLayoutProps) {
-  const { wallet } = useAuth();
 
   return (
     <div className="min-h-screen pt-20 pb-8">
+      {/* Floating Sticky Jackpot */}
+      <FloatingJackpot />
+      
       <div className="container mx-auto">
         {/* Game Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-start justify-start mb-8">
           <Link href="/dashboard">
             <Button
               variant="ghost"
@@ -79,21 +81,35 @@ export default function GameLayout({ title, description, children }: GameLayoutP
               <span>Back to Dashboard</span>
             </Button>
           </Link>
-
-          <div className="glass-card px-6 py-3 rounded-lg">
-            <span className="text-gold-500 font-semibold">
-              {wallet ? parseFloat(wallet.coins).toLocaleString() : "0"}
-            </span>
-            <span className="text-gray-300 ml-1">Coins</span>
-          </div>
         </div>
+      </div>
 
-        {/* Game Title */}
-        <div className="text-center mb-8">
-          <h2 className="text-4xl font-display font-bold text-gold-500 mb-2">{title}</h2>
-          <p className="text-gray-300">{description}</p>
+      {/* Game Title - Full Width */}
+      <div className="relative text-center mb-8 w-full">
+        {/* Background Image for Crash Game */}
+        {title === "Crash" && (
+          <div 
+            className="absolute inset-0 bg-cover bg-bottom bg-no-repeat opacity-40 w-full"
+            style={{ backgroundImage: 'url(/images/crash.jpg)' }}
+          />
+        )}
+        {/* Dark overlay for better text readability */}
+        {title === "Crash" && (
+          <div className="absolute inset-0 bg-black/60 w-full" />
+        )}
+        {/* Content */}
+        <div className={`relative z-10 ${title === "Crash" ? "py-8 px-6" : ""}`}>
+          <h2 className={`text-4xl font-display font-bold mb-2 flex items-center justify-center gap-3 ${title === "Crash" ? "text-white drop-shadow-lg" : "text-gold-500"}`}>
+            {title === "Crash" && <span className="text-5xl">🚀</span>}
+            {title}
+          </h2>
+          <p className={`${title === "Crash" ? "text-white/90 drop-shadow-md" : "text-gray-300"}`}>
+            {description}
+          </p>
         </div>
+      </div>
 
+      <div className="container mx-auto">
         {/* Game Content */}
         {children || (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">

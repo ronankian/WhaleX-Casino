@@ -45,6 +45,15 @@ export const gameResults = pgTable("game_results", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const jackpot = pgTable("jackpot", {
+  id: serial("id").primaryKey(),
+  totalPool: decimal("total_pool", { precision: 12, scale: 4 }).notNull().default("0.0000"), // Starting jackpot
+  lastWinner: text("last_winner"),
+  lastWonAmount: decimal("last_won_amount", { precision: 12, scale: 4 }).default("0.0000"),
+  lastWonAt: timestamp("last_won_at"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const deposits = pgTable("deposits", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
@@ -80,6 +89,11 @@ export const insertGameResultSchema = createInsertSchema(gameResults).omit({
   createdAt: true,
 });
 
+export const insertJackpotSchema = createInsertSchema(jackpot).omit({
+  id: true,
+  updatedAt: true,
+});
+
 export const insertDepositSchema = createInsertSchema(deposits).omit({
   id: true,
   createdAt: true,
@@ -98,6 +112,8 @@ export type Wallet = typeof wallets.$inferSelect;
 export type InsertWallet = z.infer<typeof insertWalletSchema>;
 export type GameResult = typeof gameResults.$inferSelect;
 export type InsertGameResult = z.infer<typeof insertGameResultSchema>;
+export type Jackpot = typeof jackpot.$inferSelect;
+export type InsertJackpot = z.infer<typeof insertJackpotSchema>;
 export type Deposit = typeof deposits.$inferSelect;
 export type InsertDeposit = z.infer<typeof insertDepositSchema>;
 export type Withdrawal = typeof withdrawals.$inferSelect;

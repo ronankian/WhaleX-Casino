@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 
 const bgUrl = "/images/bg.png";
 const logoUrl = "/images/brand.png";
@@ -10,38 +11,54 @@ const brandColorHover = "#1de9b6";
 export default function Register() {
   const [, setLocation] = useLocation();
   const { register, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
-      setLocation("/dashboard");
+      setLocation("/home");
     }
   }, [isAuthenticated, setLocation]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
     try {
       if (!username || !email || !password || !confirmPassword) {
-        setError("Please fill in all fields.");
+        toast({
+          title: "Missing Information",
+          description: "Please fill in all fields.",
+          className: "bg-black/90 border-red-500 text-white",
+        });
         setLoading(false);
         return;
       }
       if (password !== confirmPassword) {
-        setError("Passwords do not match.");
+        toast({
+          title: "Password Mismatch",
+          description: "Passwords do not match.",
+          className: "bg-black/90 border-red-500 text-white",
+        });
         setLoading(false);
         return;
       }
       await register(username, email, password);
+      toast({
+        title: "Success!",
+        description: "Your account has been created successfully.",
+        className: "bg-black/90 border-zinc-700 text-white",
+      });
       // No direct setLocation here; redirect will happen in useEffect
     } catch (err: any) {
-      setError(err?.message || "Registration failed. Please try again.");
+      toast({
+        title: "Registration Failed",
+        description: err?.message || "Registration failed. Please try again.",
+        className: "bg-black/90 border-red-500 text-white",
+      });
     } finally {
       setLoading(false);
     }
@@ -98,7 +115,6 @@ export default function Register() {
           value={confirmPassword}
           onChange={e => setConfirmPassword(e.target.value)}
         />
-        {error && <div className="text-red-400 mb-4">{error}</div>}
         <button
           type="submit"
           style={{ backgroundColor: brandColor, color: "#18181b" }}

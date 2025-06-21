@@ -1,13 +1,12 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "../hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { 
-  Coins, 
-  Gamepad2, 
-  Trophy, 
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Coins,
+  Gamepad2,
+  Trophy,
   TrendingUp,
   Dices,
   Crown,
@@ -17,10 +16,10 @@ import {
   Circle,
   Target
 } from "lucide-react";
-import { formatCurrency, formatMoby } from "@/lib/game-utils";
-import GameLayout from "@/components/games/game-layout";
+import { formatCurrency, formatMoby } from "../lib/game-utils";
+import GameLayout from "../components/games/game-layout";
 
-export default function Dashboard() {
+export default function Casino() {
   const [, setLocation] = useLocation();
   const { user, wallet, isAuthenticated } = useAuth();
 
@@ -39,71 +38,12 @@ export default function Dashboard() {
     return null;
   }
 
-  const games = [
-    {
-      id: "dice",
-      name: "Dice Roll",
-      description: "Roll the dice and predict the outcome",
-      icon: Dices,
-      color: "from-red-500 to-red-600",
-      path: "/games/dice"
-    },
-    {
-      id: "slots",
-      name: "Slot 777",
-      description: "Classic slot machine with big payouts",
-      icon: Crown,
-      color: "from-purple-500 to-purple-600",
-      path: "/games/slots"
-    },
-    {
-      id: "hilo",
-      name: "Hi-Lo",
-      description: "Guess if the next card is higher or lower",
-      icon: Spade,
-      color: "from-green-500 to-green-600",
-      path: "/games/hilo"
-    },
-    {
-      id: "crash",
-      name: "Crash",
-      description: "Cash out before the multiplier crashes",
-      icon: BarChart3,
-      color: "from-orange-500 to-orange-600",
-      path: "/games/crash"
-    },
-    {
-      id: "mines",
-      name: "Mines",
-      description: "Find gems while avoiding hidden mines",
-      icon: Gem,
-      color: "from-emerald-500 to-emerald-600",
-      path: "/games/mines"
-    },
-    {
-      id: "plinko",
-      name: "Plinko",
-      description: "Drop the ball and watch it bounce to fortune",
-      icon: Circle,
-      color: "from-indigo-500 to-indigo-600",
-      path: "/games/plinko"
-    },
-    {
-      id: "roulette",
-      name: "Roulette",
-      description: "Place your bets and spin the wheel",
-      icon: Target,
-      color: "from-red-500 to-pink-600",
-      path: "/games/roulette"
-    }
-  ];
-
   const stats = {
     balance: parseFloat(wallet.coins),
     moby: parseFloat(wallet.mobyTokens),
     mobyCoins: parseFloat(wallet.mobyCoins),
     gamesPlayed: Array.isArray(gameHistory) ? gameHistory.length : 0,
-    winRate: Array.isArray(gameHistory) && gameHistory.length ? 
+    winRate: Array.isArray(gameHistory) && gameHistory.length ?
       Math.round((gameHistory.filter(g => g.isWin).length / gameHistory.length) * 100) : 0
   };
 
@@ -219,4 +159,4 @@ export default function Dashboard() {
       </div>
     </div>
   );
-}
+} 
