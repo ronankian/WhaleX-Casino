@@ -16,6 +16,19 @@ import {
   formatCurrency,
 } from "../../lib/game-utils";
 
+// Sound utility function
+const playSound = (soundFile: string) => {
+  try {
+    const audio = new Audio(`/sounds/${soundFile}`);
+    audio.volume = 0.5; // Set volume to 50%
+    audio.play().catch(error => {
+      console.log("Could not play sound:", error);
+    });
+  } catch (error) {
+    console.log("Sound error:", error);
+  }
+};
+
 const MAX_MULTIPLIER = 2.00;
 
 export default function CrashGame() {
@@ -202,12 +215,23 @@ export default function CrashGame() {
       // Add cash out to history
       setRecentCrashes(prev => [{ multiplier: cashOutMultiplier, isCrash: false }, ...prev.slice(0, 7)]);
       
-      // Show immediate success message
+      // Play win sound and show immediate success message
+      try {
+        const audio = new Audio('/sounds/win.mp3');
+        audio.volume = 0.5;
+        audio.play().catch(error => console.log("Could not play sound:", error));
+      } catch (error) {
+        console.log("Sound error:", error);
+      }
+      
       toast({
         title: "💰 Cashed Out!",
         description: `You won ${formatCurrency(payout)} at ${cashOutMultiplier.toFixed(2)}x!`,
-        className: "bg-black/90 border-gold-400 text-white",
+        className: "bg-black/90 border-green-500 text-white",
       });
+      
+      // Play sound
+      playSound("win.mp3");
       
       // Make API call in background to record the result
       cashOutMutation.mutate(cashOutMultiplier);
@@ -269,15 +293,27 @@ export default function CrashGame() {
           setGameActive(false);
           setHasBet(false);
           
+          // Play lose sound
+          try {
+            const audio = new Audio('/sounds/lose.mp3');
+            audio.volume = 0.5;
+            audio.play().catch(error => console.log("Could not play sound:", error));
+          } catch (error) {
+            console.log("Sound error:", error);
+          }
+          
           toast({
             title: isJackpot ? "🎰 JACKPOT CRASH!" : "💥 Crashed!",
             description: isJackpot 
               ? `RARE 2.00x JACKPOT CRASH! You lost ${formatCurrency(betAmount)}, but that was amazing odds!`
               : `Game crashed at ${randomCrash.toFixed(2)}x. You lost ${formatCurrency(betAmount)}.`,
             className: isJackpot 
-              ? "bg-black/90 border-gold-400 text-white" 
+              ? "bg-black/90 border-red-500 text-white" 
               : "bg-black/90 border-red-500 text-white",
           });
+          
+          // Play sound
+          playSound(isJackpot ? "jackpot.mp3" : "crash.mp3");
           
           // Reset after explosion animation
           window.setTimeout(() => {
@@ -312,12 +348,23 @@ export default function CrashGame() {
       // Add auto cash out to history
       setRecentCrashes(prev => [{ multiplier: cashOutMultiplier, isCrash: false }, ...prev.slice(0, 7)]);
       
-      // Show immediate success message
+      // Play win sound for auto cash out
+      try {
+        const audio = new Audio('/sounds/win.mp3');
+        audio.volume = 0.5;
+        audio.play().catch(error => console.log("Could not play sound:", error));
+      } catch (error) {
+        console.log("Sound error:", error);
+      }
+      
       toast({
         title: "🤖 Auto Cashed Out!",
         description: `Auto cash out at ${cashOutMultiplier.toFixed(2)}x! You won ${formatCurrency(payout)}!`,
-        className: "bg-black/90 border-gold-400 text-white",
+        className: "bg-black/90 border-green-500 text-white",
       });
+      
+      // Play sound
+      playSound("auto_cash_out.mp3");
       
       // Make API call in background to record the result
       cashOutMutation.mutate(cashOutMultiplier);
@@ -337,27 +384,35 @@ export default function CrashGame() {
             <CardContent className="space-y-4">
               <div>
                 <label className="text-white/80 text-sm font-medium block mb-1">Bet Amount</label>
-                <Input 
-                  type="number" 
-                  value={betAmount} 
-                  onChange={(e) => {
-                    const inputValue = e.target.value;
-                    if (inputValue === "" || inputValue === "0") {
-                      setBetAmount(0.01);
-                    } else {
-                      const value = parseFloat(inputValue) || 0;
-                      const maxBet = wallet ? parseFloat(wallet.coins) : 0;
-                      setBetAmount(Math.min(value, maxBet));
-                    }
-                  }}
-                  max={wallet ? parseFloat(wallet.coins) : 0}
-                  min={0.01}
-                  step={0.01}
-                  disabled={gameActive || hasBet} 
-                  className={`bg-zinc-900/80 text-white border-zinc-700 ${
-                    betAmount > parseFloat(wallet?.coins || '0') ? 'border-red-500 focus:border-red-500' : ''
-                  }`}
-                />
+                <div className="relative">
+                  <Input 
+                    type="number" 
+                    value={betAmount || ''} 
+                    placeholder="Enter bet amount"
+                    onChange={(e) => {
+                      const inputValue = e.target.value;
+                      if (inputValue === "" || inputValue === "0") {
+                        setBetAmount(0.01);
+                      } else {
+                        const value = parseFloat(inputValue) || 0;
+                        const maxBet = wallet ? parseFloat(wallet.coins) : 0;
+                        setBetAmount(Math.min(value, maxBet));
+                      }
+                    }}
+                    max={wallet ? parseFloat(wallet.coins) : 0}
+                    min={0.01}
+                    step={0.01}
+                    disabled={gameActive || hasBet} 
+                    className={`bg-zinc-900/80 text-white border-zinc-700 pr-12 ${
+                      betAmount > parseFloat(wallet?.coins || '0') ? 'border-red-500 focus:border-red-500' : ''
+                    }`}
+                  />
+                  <img 
+                    src="/images/coin.png" 
+                    alt="Coins" 
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 z-10"
+                  />
+                </div>
                 {betAmount > parseFloat(wallet?.coins || '0') && (
                   <p className="text-red-400 text-xs mt-1">
                     Insufficient balance. Maximum bet: {formatCurrency(parseFloat(wallet?.coins || '0'))}
