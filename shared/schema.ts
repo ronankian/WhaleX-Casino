@@ -75,6 +75,16 @@ export const withdrawals = pgTable("withdrawals", {
   processedAt: timestamp("processed_at"),
 });
 
+export const farmCharacters = pgTable("farm_characters", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  characterType: text("character_type").notNull(), // "Fisherman", "Woodcutter", etc.
+  level: integer("level").notNull().default(1),
+  hired: boolean("hired").notNull().default(false),
+  status: text("status").notNull().default("Idle"),
+  totalCatch: integer("total_catch").notNull().default(0),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   joinDate: true,
@@ -106,6 +116,10 @@ export const insertWithdrawalSchema = createInsertSchema(withdrawals).omit({
   processedAt: true,
 });
 
+export const insertFarmCharacterSchema = createInsertSchema(farmCharacters).omit({
+  id: true,
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Wallet = typeof wallets.$inferSelect;
@@ -118,3 +132,5 @@ export type Deposit = typeof deposits.$inferSelect;
 export type InsertDeposit = z.infer<typeof insertDepositSchema>;
 export type Withdrawal = typeof withdrawals.$inferSelect;
 export type InsertWithdrawal = z.infer<typeof insertWithdrawalSchema>;
+export type FarmCharacter = typeof farmCharacters.$inferSelect;
+export type InsertFarmCharacter = z.infer<typeof insertFarmCharacterSchema>;

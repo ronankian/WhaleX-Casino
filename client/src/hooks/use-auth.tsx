@@ -1,7 +1,7 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import type { User, Wallet } from "@shared/schema";
+import { apiRequest } from "../lib/queryClient";
+import type { User, Wallet } from "../../../shared/schema";
 
 interface AuthContextType {
   user: User | null;
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { data: walletData, error: walletError } = useQuery({
     queryKey: ["/api/wallet/" + user?.id],
     enabled: !!user?.id,
-    refetchInterval: 5000, // Refresh wallet every 5 seconds
+    refetchInterval: false, // Disable automatic refresh during development
     retry: 1,
   });
 
@@ -80,8 +80,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const savedUser = localStorage.getItem("whalex_user");
     const savedWallet = localStorage.getItem("whalex_wallet");
     
+    console.log("Auth: Loading from localStorage. Saved user string:", savedUser);
+    
     if (savedUser && savedWallet) {
-      setUser(JSON.parse(savedUser));
+      const parsedUser = JSON.parse(savedUser);
+      console.log("Auth: Parsed user object from localStorage:", parsedUser);
+      setUser(parsedUser);
       setWallet(JSON.parse(savedWallet));
     }
   }, []);

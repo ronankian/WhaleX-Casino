@@ -16,18 +16,66 @@ import {
   formatCurrency,
 } from "../../lib/game-utils";
 
-// Sound utility function
-const playSound = (soundFile: string) => {
-  try {
-    const audio = new Audio(`/sounds/${soundFile}`);
-    audio.volume = 0.5; // Set volume to 50%
-    audio.play().catch(error => {
-      console.log("Could not play sound:", error);
-    });
-  } catch (error) {
-    console.log("Sound error:", error);
+// Preloaded Audio System for instant playback
+class AudioManager {
+  private sounds: { [key: string]: HTMLAudioElement } = {};
+  
+  constructor() {
+    this.preloadSounds();
   }
-};
+  
+  private preloadSounds() {
+    const soundFiles = {
+      win: '/sounds/win.mp3',
+      lose: '/sounds/lose.mp3',
+      crash: '/sounds/lose.mp3', // Use lose sound for crash
+      jackpot: '/sounds/win.mp3', // Use win sound for jackpot (or create specific one)
+      autoCashOut: '/sounds/win.mp3' // Use win sound for auto cash out
+    };
+    
+    Object.entries(soundFiles).forEach(([key, path]) => {
+      const audio = new Audio(path);
+      audio.volume = 0.5;
+      audio.preload = 'auto';
+      
+      // Handle loading
+      audio.addEventListener('canplaythrough', () => {
+        console.log(`Audio ${key} preloaded successfully`);
+      });
+      
+      audio.addEventListener('error', (e) => {
+        console.warn(`Failed to preload audio ${key}:`, e);
+      });
+      
+      this.sounds[key] = audio;
+    });
+  }
+  
+  play(soundName: string) {
+    const sound = this.sounds[soundName];
+    if (sound) {
+      try {
+        sound.currentTime = 0; // Reset to start for instant replay
+        sound.play().catch(error => {
+          console.log(`Could not play sound ${soundName}:`, error);
+        });
+      } catch (error) {
+        console.log(`Sound error for ${soundName}:`, error);
+      }
+    } else {
+      console.warn(`Sound ${soundName} not found in preloaded sounds`);
+    }
+  }
+  
+  setVolume(volume: number) {
+    Object.values(this.sounds).forEach(sound => {
+      sound.volume = Math.max(0, Math.min(1, volume));
+    });
+  }
+}
+
+// Create global audio manager instance
+const audioManager = new AudioManager();
 
 const MAX_MULTIPLIER = 2.00;
 
@@ -98,7 +146,7 @@ export default function CrashGame() {
     // Cloud animation - always running
     cloudInterval = window.setInterval(() => {
       setCloudFrame(prev => (prev + 1) % 3); // Cycle through 3 cloud images
-    }, 2000) as any; // Change cloud every 2 seconds
+    }, 800) as any; // Change cloud every 0.8 seconds (faster movement)
     
     if (rocketState === 'launching') {
       animationInterval = window.setInterval(() => {
@@ -107,7 +155,7 @@ export default function CrashGame() {
       
       effectInterval = window.setInterval(() => {
         setEffectFrame(prev => (prev + 1) % 2); // Alternate between 2 effect frames
-      }, 100) as any;
+      }, 50) as any; // Faster thruster animation (50ms instead of 100ms)
     } else if (rocketState === 'crashed') {
       setFrame(0);
       const explosionFrames = 9;
@@ -215,23 +263,14 @@ export default function CrashGame() {
       // Add cash out to history
       setRecentCrashes(prev => [{ multiplier: cashOutMultiplier, isCrash: false }, ...prev.slice(0, 7)]);
       
-      // Play win sound and show immediate success message
-      try {
-        const audio = new Audio('/sounds/win.mp3');
-        audio.volume = 0.5;
-        audio.play().catch(error => console.log("Could not play sound:", error));
-      } catch (error) {
-        console.log("Sound error:", error);
-      }
-      
       toast({
         title: "💰 Cashed Out!",
         description: `You won ${formatCurrency(payout)} at ${cashOutMultiplier.toFixed(2)}x!`,
         className: "bg-black/90 border-green-500 text-white",
       });
       
-      // Play sound
-      playSound("win.mp3");
+      // Play win sound
+      audioManager.play("win");
       
       // Make API call in background to record the result
       cashOutMutation.mutate(cashOutMultiplier);
@@ -293,15 +332,6 @@ export default function CrashGame() {
           setGameActive(false);
           setHasBet(false);
           
-          // Play lose sound
-          try {
-            const audio = new Audio('/sounds/lose.mp3');
-            audio.volume = 0.5;
-            audio.play().catch(error => console.log("Could not play sound:", error));
-          } catch (error) {
-            console.log("Sound error:", error);
-          }
-          
           toast({
             title: isJackpot ? "🎰 JACKPOT CRASH!" : "💥 Crashed!",
             description: isJackpot 
@@ -312,8 +342,8 @@ export default function CrashGame() {
               : "bg-black/90 border-red-500 text-white",
           });
           
-          // Play sound
-          playSound(isJackpot ? "jackpot.mp3" : "crash.mp3");
+          // Play crash sound (handles both jackpot and regular crash)
+          audioManager.play(isJackpot ? "jackpot" : "crash");
           
           // Reset after explosion animation
           window.setTimeout(() => {
@@ -348,23 +378,14 @@ export default function CrashGame() {
       // Add auto cash out to history
       setRecentCrashes(prev => [{ multiplier: cashOutMultiplier, isCrash: false }, ...prev.slice(0, 7)]);
       
-      // Play win sound for auto cash out
-      try {
-        const audio = new Audio('/sounds/win.mp3');
-        audio.volume = 0.5;
-        audio.play().catch(error => console.log("Could not play sound:", error));
-      } catch (error) {
-        console.log("Sound error:", error);
-      }
-      
       toast({
         title: "🤖 Auto Cashed Out!",
         description: `Auto cash out at ${cashOutMultiplier.toFixed(2)}x! You won ${formatCurrency(payout)}!`,
         className: "bg-black/90 border-green-500 text-white",
       });
       
-      // Play sound
-      playSound("auto_cash_out.mp3");
+      // Play win sound for auto cash out
+      audioManager.play("win");
       
       // Make API call in background to record the result
       cashOutMutation.mutate(cashOutMultiplier);

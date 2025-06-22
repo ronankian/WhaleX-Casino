@@ -12,6 +12,9 @@ export function hashPassword(password: string): Promise<string> {
 
 export function verifyPassword(password: string, hash: string): Promise<boolean> {
   return new Promise((resolve, reject) => {
+    if (!hash) {
+      return resolve(false);
+    }
     const [salt, key] = hash.split(":");
     crypto.scrypt(password, salt, 64, (err, derivedKey) => {
       if (err) reject(err);

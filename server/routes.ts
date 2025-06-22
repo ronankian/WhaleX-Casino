@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { z } from "zod";
-import { insertUserSchema, insertGameResultSchema, insertDepositSchema, insertWithdrawalSchema } from "@shared/schema";
+import { insertUserSchema, insertGameResultSchema, insertDepositSchema, insertWithdrawalSchema, insertFarmCharacterSchema } from "@shared/schema";
 import { storage } from "./storage.js";
 import crypto from "crypto";
 import { hashPassword, verifyPassword } from "./utils.js";
@@ -17,10 +17,36 @@ const gamePlaySchema = z.object({
   gameData: z.record(z.any()),
 });
 
+const farmActionSchema = z.object({
+  userId: z.number(),
+  characterType: z.string(),
+});
+
 const tokenConvertSchema = z.object({
   amount: z.number().positive(),
   direction: z.enum(["moby-to-tokmoby", "tokmoby-to-moby"]),
 });
+
+const levelUpCosts: { [key: string]: number } = {
+  'Fisherman': 100,
+  'Woodcutter': 500,
+  'Steamman': 2000,
+  'Graverobber': 5000
+};
+
+const HIRE_COSTS = [1000, 5000, 20000, 50000];
+const LEVEL_UP_COSTS = [
+  0.0100, 0.0150, 0.0225, 0.0325, 0.0450, 0.0600, 0.0775, 0.0975, 0.1200, 0.1450,
+  0.1725, 0.2025, 0.2350, 0.2700, 0.3075, 0.3475, 0.3900, 0.4350, 0.4825, 0.5325,
+  0.5850, 0.6400, 0.6975, 0.7575,
+];
+
+const ALL_CHARACTERS = [
+  { name: "Fisherman", profileImg: "/farm/fishing/Character animation/Fisherman/Fisherman_profile.png" },
+  { name: "Graverobber", profileImg: "/farm/fishing/Character animation/Graverobber/Graverobber_profile.png" },
+  { name: "Steamman", profileImg: "/farm/fishing/Character animation/Steamman/Steamman_profile.png" },
+  { name: "Woodcutter", profileImg: "/farm/fishing/Character animation/Woodcutter/Woodcutter_profile.png" },
+];
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -150,6 +176,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedWallet);
     } catch (error) {
       res.status(400).json({ message: "Invalid conversion data" });
+    }
+  });
+
+  // Farm Game Routes
+  app.get("/api/farm/characters/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const userCharacters = await storage.getFarmCharacters(userId);
+      
+      const charactersWithDetails = ALL_CHARACTERS.map(staticChar => {
+        const dbChar = userCharacters.find(db => db.characterType === staticChar.name);
+        if (dbChar) {
+          return {
+            ...staticChar,
+            hired: true,
+            level: dbChar.level,
+            status: dbChar.status,
+            totalCatch: dbChar.totalCatch,
+          };
+        }
+        return {
+          ...staticChar,
+          hired: false,
+          level: 1,
+          status: 'Idle',
+          totalCatch: 0,
+        };
+      });
+      
+      res.json(charactersWithDetails);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching farm characters", error: (error as Error).message });
+    }
+  });
+
+  app.post("/api/farm/hire", async (req, res) => {
+    try {
+      const { userId, characterType } = farmActionSchema.parse(req.body);
+
+      // 1. Get user's wallet
+      const wallet = await storage.getWallet(userId);
+      if (!wallet) {
+        return res.status(404).json({ message: "Wallet not found" });
+      }
+
+      // 2. Determine hire cost
+      const userCharacters = await storage.getFarmCharacters(userId);
+      const numHired = userCharacters.length;
+      if (numHired >= HIRE_COSTS.length) {
+        return res.status(400).json({ message: "No more characters to hire" });
+      }
+      const hireCost = HIRE_COSTS[numHired];
+
+      // 3. Check balance
+      const balance = parseFloat(wallet.coins);
+      if (balance < hireCost) {
+        return res.status(400).json({ message: "Insufficient coins to hire" });
+      }
+
+      // 4. Deduct cost and create character
+      await storage.updateWallet(userId, { coins: (balance - hireCost).toFixed(2) });
+      const newCharacter = await storage.createFarmCharacter({ userId, characterType, hired: true, level: 1 });
+
+      res.status(201).json(newCharacter);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid hire request", error: (error as Error).message });
+    }
+  });
+
+  app.post("/api/farm/level-up", async (req, res) => {
+    try {
+      const { userId, characterType } = farmActionSchema.parse(req.body);
+
+      // 1. Get character and wallet
+      const character = await storage.getFarmCharacter(userId, characterType);
+      const wallet = await storage.getWallet(userId);
+      if (!character || !wallet) {
+        return res.status(404).json({ message: "Character or wallet not found" });
+      }
+      if (character.level >= 25) {
+        return res.status(400).json({ message: "Character is at max level" });
+      }
+
+      // 2. Determine level up cost
+      const levelUpCost = LEVEL_UP_COSTS[character.level - 1];
+      const mobyBalance = parseFloat(wallet.mobyTokens);
+
+      // 3. Check balance
+      if (mobyBalance < levelUpCost) {
+        return res.status(400).json({ message: "Insufficient $MOBY to level up" });
+      }
+
+      // 4. Deduct cost and update level
+      await storage.updateWallet(userId, { mobyTokens: (mobyBalance - levelUpCost).toFixed(4) });
+      const updatedCharacter = await storage.updateFarmCharacter(character.id, { level: character.level + 1 });
+      
+      res.json(updatedCharacter);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid level-up request", error: (error as Error).message });
     }
   });
 
@@ -351,7 +476,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const history = await storage.getGameResults(userId, limit);
       res.json(history);
     } catch (error) {
-      res.status(400).json({ message: "Invalid user ID" });
+      res.status(400).json({ message: "Error fetching game history" });
     }
   });
 

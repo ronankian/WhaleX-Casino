@@ -43,7 +43,7 @@ export default function FloatingJackpot() {
           {/* Treasure Chest */}
           <div className="treasure-chest-glow mb-2">
             <img 
-              src="/images/chest.png" 
+              src="/images/chest.png" id="chest"
               alt="Jackpot Chest" 
               className="h-16 w-16 sm:h-20 sm:w-20" 
             />

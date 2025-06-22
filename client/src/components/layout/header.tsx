@@ -2,13 +2,13 @@ import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   ChevronDown, User as UserIcon, LogOut, Wallet, ArrowDownCircle, ArrowUpCircle, Menu,
-  Home, Fish, Info, Dice5, Crown, Bomb, BarChart3, Target, Circle, Gamepad2, TrendingDown, Gem, FerrisWheel
+  Home, Fish, Info, Dice5, Crown, Bomb, BarChart3, Target, Circle, Gamepad2, TrendingDown, Gem, FerrisWheel, Swords
 } from "lucide-react";
 import { useAuth } from "../../hooks/use-auth";
 
 const navItems = [
   { name: "Casino", path: "/casino", icon: <Crown className="w-5 h-5 mr-2" /> },
-  { name: "Fish Farm", path: "/fish-farm", icon: <Fish className="w-5 h-5 mr-2" /> },
+  { name: "Reef Tycoon", path: "/farm", icon: <Fish className="w-5 h-5 mr-2" /> },
   { name: "About", path: "/about", icon: <Info className="w-5 h-5 mr-2" /> },
 ];
 

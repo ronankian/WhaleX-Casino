@@ -1,4 +1,5 @@
-import { useToast } from "@/hooks/use-toast"
+import React from "react";
+import { useToast } from "../../hooks/use-toast"
 import {
   Toast,
   ToastClose,
@@ -6,7 +7,7 @@ import {
   ToastProvider,
   ToastTitle,
   ToastViewport,
-} from "@/components/ui/toast"
+} from "./toast"
 
 export function Toaster() {
   const { toasts } = useToast()
@@ -14,16 +15,26 @@ export function Toaster() {
   return (
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
+        const isError = props.variant === 'destructive'
         return (
-          <Toast key={id} {...props}>
+          <Toast
+            key={id}
+            {...props}
+            className={`fixed bottom-5 right-5 w-96 p-4 rounded-lg shadow-2xl text-white
+              bg-slate-900/90 backdrop-blur-sm border-2
+              ${isError ? 'border-red-600' : 'border-green-500'}
+              transition-all animate-in slide-in-from-bottom-5`}
+          >
             <div className="grid gap-1">
-              {title && <ToastTitle>{title}</ToastTitle>}
+              {title && <ToastTitle className="text-lg font-bold">{title}</ToastTitle>}
               {description && (
-                <ToastDescription>{description}</ToastDescription>
+                <ToastDescription className="text-sm text-white/80">
+                  {description}
+                </ToastDescription>
               )}
             </div>
             {action}
-            <ToastClose />
+            <ToastClose className="absolute top-2 right-2 text-white/80 hover:text-white" />
           </Toast>
         )
       })}

@@ -1,11 +1,12 @@
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import {
-  users, wallets, gameResults, deposits, withdrawals, jackpot,
+  users, wallets, gameResults, deposits, withdrawals, jackpot, farmCharacters,
   type User, type InsertUser, type Wallet, type InsertWallet,
   type GameResult, type InsertGameResult, type Deposit, type InsertDeposit,
-  type Withdrawal, type InsertWithdrawal, type Jackpot, type InsertJackpot
+  type Withdrawal, type InsertWithdrawal, type Jackpot, type InsertJackpot,
+  type FarmCharacter, type InsertFarmCharacter
 } from "@shared/schema";
 
 if (!process.env.DATABASE_URL) {
@@ -46,6 +47,12 @@ export interface IStorage {
   createWithdrawal(withdrawal: InsertWithdrawal): Promise<Withdrawal>;
   getWithdrawals(userId?: number): Promise<Withdrawal[]>;
   updateWithdrawal(id: number, updates: Partial<Withdrawal>): Promise<Withdrawal | undefined>;
+
+  // Farm character operations
+  getFarmCharacters(userId: number): Promise<FarmCharacter[]>;
+  getFarmCharacter(userId: number, characterType: string): Promise<FarmCharacter | undefined>;
+  createFarmCharacter(character: InsertFarmCharacter): Promise<FarmCharacter>;
+  updateFarmCharacter(id: number, updates: Partial<FarmCharacter>): Promise<FarmCharacter | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -175,6 +182,26 @@ export class DbStorage implements IStorage {
     
     const newTotal = parseFloat(currentJackpot.totalPool) + amount;
     return this.updateJackpot({ totalPool: newTotal.toFixed(4) });
+  }
+
+  async getFarmCharacters(userId: number): Promise<FarmCharacter[]> {
+    return db.select().from(farmCharacters).where(eq(farmCharacters.userId, userId));
+  }
+
+  async getFarmCharacter(userId: number, characterType: string): Promise<FarmCharacter | undefined> {
+    const result = await db.select().from(farmCharacters)
+      .where(and(eq(farmCharacters.userId, userId), eq(farmCharacters.characterType, characterType)));
+    return result[0];
+  }
+
+  async createFarmCharacter(character: InsertFarmCharacter): Promise<FarmCharacter> {
+    const result = await db.insert(farmCharacters).values(character).returning();
+    return result[0];
+  }
+
+  async updateFarmCharacter(id: number, updates: Partial<FarmCharacter>): Promise<FarmCharacter | undefined> {
+    const result = await db.update(farmCharacters).set(updates).where(eq(farmCharacters.id, id)).returning();
+    return result[0];
   }
 }
 

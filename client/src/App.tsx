@@ -10,7 +10,7 @@ import Header from "./components/layout/header";
 import Landing from "./pages/landing";
 import Home from "./pages/home";
 import Casino from "./pages/casino";
-import FishFarm from "./pages/fish-farm";
+import Farm from "./pages/farm";
 import About from "./pages/about";
 import DiceGame from "./pages/games/dice";
 import SlotsGame from "./pages/games/slots";
@@ -34,7 +34,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/casino" component={Casino} />
-      <Route path="/fish-farm" component={FishFarm} />
+      <Route path="/farm" component={Farm} />
       <Route path="/about" component={About} />
       <Route path="/games/dice" component={DiceGame} />
       <Route path="/games/slots" component={SlotsGame} />
