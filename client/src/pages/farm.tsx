@@ -1,7 +1,7 @@
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import GameLayout from "../components/games/game-layout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -16,14 +16,22 @@ const LEVEL_UP_COSTS = [
 
 const HIRE_COSTS = [1000, 5000, 20000, 50000];
 
+const dockPositions = [
+    { style: { bottom: "15%", left: "17%", width: '15%' }, animationType: 'fish' },
+    { style: { bottom: "28%", right: "32%", width: '15%' }, animationType: 'fish' },
+    { style: { bottom: "5%", right: "15%", zIndex: 10, width: '15%' }, animationType: 'row' },
+    { style: { bottom: "8%", right: "3%", zIndex: 5, width: '15%' }, animationType: 'fish' },
+];
+
 export default function FarmPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("dock");
   const [selectedCharacterIndex, setSelectedCharacterIndex] = useState(0);
+  const [animationStates, setAnimationStates] = useState<{ [key: string]: string }>({});
 
-  const { data: characters = [], isLoading: isLoadingCharacters, isError: isErrorCharacters } = useQuery({
+  const { data: farmData, isLoading: isLoadingFarm, isError: isErrorFarm } = useQuery({
     queryKey: ["farmCharacters", user?.id],
     queryFn: () => fetchCharacters(user!.id),
     enabled: !!user,
@@ -66,20 +74,49 @@ export default function FarmPage() {
     },
   });
   
+  const allCharacters = farmData?.allCharacters || [];
+  const hiredCharacters = farmData?.hiredCharacters || [];
+
+  useEffect(() => {
+    const timers: NodeJS.Timeout[] = [];
+    if (hiredCharacters.length > 0) {
+      hiredCharacters.forEach((char: any) => {
+        // Initialize state if not present
+        if (!animationStates[char.id]) {
+          setAnimationStates(prev => ({...prev, [char.id]: 'fish'}));
+        }
+
+        const timer = setInterval(() => {
+          setAnimationStates(prev => ({...prev, [char.id]: 'hook'}));
+
+          const hookTimer = setTimeout(() => {
+            setAnimationStates(prev => ({...prev, [char.id]: 'fish'}));
+          }, 1000); // hook animation duration
+          timers.push(hookTimer);
+
+        }, 60000); // 1 minute countdown
+        timers.push(timer);
+      });
+    }
+    return () => {
+      timers.forEach(clearInterval);
+    };
+  }, [hiredCharacters]);
+
   if (!user) return <GameLayout title="🎣 Reef Tycoon" description="..."><div className="text-white">Please log in to play.</div></GameLayout>;
-  if (isLoadingCharacters || isLoadingLevelStats) return <GameLayout title="🎣 Reef Tycoon" description="..."><div className="text-white">Loading Farm...</div></GameLayout>;
-  if (isErrorCharacters) return <GameLayout title="🎣 Reef Tycoon" description="..."><div className="text-white">Error fetching your farm data. Please try again later.</div></GameLayout>;
+  if (isLoadingFarm || isLoadingLevelStats) return <GameLayout title="🎣 Reef Tycoon" description="..."><div className="text-white">Loading Farm...</div></GameLayout>;
+  if (isErrorFarm) return <GameLayout title="🎣 Reef Tycoon" description="..."><div className="text-white">Error fetching your farm data. Please try again later.</div></GameLayout>;
   if (isErrorLevelStats) return <GameLayout title="🎣 Reef Tycoon" description="..."><div className="text-white">Error fetching game configuration. Please try again later.</div></GameLayout>;
 
-  if (!Array.isArray(characters) || !Array.isArray(levelStats)) {
+  if (!farmData || !Array.isArray(allCharacters) || !Array.isArray(hiredCharacters) || !Array.isArray(levelStats)) {
     return <GameLayout title="🎣 Reef Tycoon" description="..."><div className="text-white">Receiving unexpected data from the server.</div></GameLayout>;
   }
   
-  if (characters.length === 0 || levelStats.length === 0) {
+  if (allCharacters.length === 0 || levelStats.length === 0) {
     return <GameLayout title="🎣 Reef Tycoon" description="..."><div className="text-white">No character or level data found.</div></GameLayout>;
   }
 
-  const character = characters[selectedCharacterIndex];
+  const character = allCharacters[selectedCharacterIndex];
   
   if (!character) {
       return <GameLayout title="🎣 Reef Tycoon" description="..."><div className="text-white">Selected character not found.</div></GameLayout>;
@@ -87,13 +124,23 @@ export default function FarmPage() {
 
   const stats = levelStats[character.level - 1];
   const levelUpCost = character.level < 25 ? LEVEL_UP_COSTS[character.level - 1] : 'MAX';
-  const numHired = characters.filter((c: any) => c.hired).length;
+  const numHired = allCharacters.filter((c: any) => c.hired).length;
   const hireCost = HIRE_COSTS[numHired];
 
-  const getStorageSlots = (level: number) => 30 + (Math.floor((level -1) / 5) * 5);
+  const getStorageSlots = (level: number) => {
+    let slots = 30;
+    if (level >= 25) slots += 5;
+    if (level >= 20) slots += 5;
+    if (level >= 15) slots += 5;
+    if (level >= 10) slots += 5;
+    if (level >= 5) slots += 10;
+    return slots;
+  };
   
-  const handlePrevCharacter = () => setSelectedCharacterIndex((prev) => (prev === 0 ? characters.length - 1 : prev - 1));
-  const handleNextCharacter = () => setSelectedCharacterIndex((prev) => (prev === characters.length - 1 ? 0 : prev + 1));
+  const totalStorageSlots = hiredCharacters.reduce((acc: number, char: any) => acc + getStorageSlots(char.level), 0);
+
+  const handlePrevCharacter = () => setSelectedCharacterIndex((prev) => (prev === 0 ? allCharacters.length - 1 : prev - 1));
+  const handleNextCharacter = () => setSelectedCharacterIndex((prev) => (prev === allCharacters.length - 1 ? 0 : prev + 1));
   
   const handleHire = () => {
     if (!user) return;
@@ -116,11 +163,11 @@ export default function FarmPage() {
           <Card className="bg-gray-900/50 border-gray-700">
              <CardHeader>
               <div className="flex justify-between items-center">
-                <Button variant="ghost" size="icon" onClick={handlePrevCharacter} disabled={characters.length <= 1}>
+                <Button variant="ghost" size="icon" onClick={handlePrevCharacter} disabled={allCharacters.length <= 1}>
                   <ChevronLeftIcon className="w-6 h-6" />
                 </Button>
                 <CardTitle className="text-center font-bold text-xl">{character.name}</CardTitle>
-                <Button variant="ghost" size="icon" onClick={handleNextCharacter} disabled={characters.length <= 1}>
+                <Button variant="ghost" size="icon" onClick={handleNextCharacter} disabled={allCharacters.length <= 1}>
                   <ChevronRightIcon className="w-6 h-6" />
                 </Button>
               </div>
@@ -136,7 +183,7 @@ export default function FarmPage() {
                   <Badge className="bg-green-600/80 text-white font-semibold">Level {character.level}</Badge>
                   <div className="w-full space-y-2 text-sm pt-2">
                     <div className="flex justify-between"><span>Catch Rate:</span> <span className="font-bold text-green-400">{stats?.fishPerMin}/min</span></div>
-                    <div className="flex justify-between"><span>Bonus Chance:</span> <span className="font-bold text-green-400">{stats?.bonusChance.toFixed(1)}%</span></div>
+                    <div className="flex justify-between"><span>Bonus Catch:</span> <span className="font-bold text-green-400">{stats?.bonusChance.toFixed(1)}%</span></div>
                     <div className="flex justify-between"><span>Storage:</span> <span className="font-bold">0/{getStorageSlots(character.level)}</span></div>
                     <div className="flex justify-between"><span>Status:</span> <span className="font-bold text-yellow-400">{character.status}</span></div>
                     <div className="flex justify-between"><span>Total Catch:</span> <span className="font-bold">{character.totalCatch}</span></div>
@@ -236,26 +283,43 @@ export default function FarmPage() {
                 <img
                   src="/farm/fishing/Objects/Boat.png"
                   alt="Boat"
-                  className="absolute w-[23%]"
-                  style={{ bottom: "7%", right: "7%" }}
+                  className="absolute w-[25%]"
+                  style={{ bottom: "7%", right: "7%", zIndex: 10 }}
                 />
-                <img
-                  src="/farm/fishing/Character animation/Fisherman/Fisherman_fish.gif"
-                  alt="Fisherman fishing"
-                  className="absolute w-[15%]"
-                  style={{ bottom: "15%", left: "17%" }}
-                />
-                                <img
-                  src="/farm/fishing/Character animation/Fisherman/Fisherman_fish.gif"
-                  alt="Fisherman fishing"
-                  className="absolute w-[15%]"
-                  style={{ bottom: "28%", right: "32%" }}
-                />
+                {hiredCharacters.map((char: any, index: number) => {
+                  const position = dockPositions[index];
+                  if (!position) return null;
+
+                  let currentAnimationType = animationStates[char.id] || position.animationType;
+
+                  const characterName = char.characterType.charAt(0).toUpperCase() + char.characterType.slice(1);
+                  const animationFile = `${characterName}_${currentAnimationType}.gif`;
+                  const imageSrc = `/farm/fishing/Character animation/${characterName}/${animationFile}`;
+                  
+                  return (
+                    <img
+                      key={char.id}
+                      src={imageSrc}
+                      alt={`${characterName} animation`}
+                      className="absolute"
+                      style={position.style as React.CSSProperties}
+                    />
+                  );
+                })}
               </>
             )}
             {activeTab === "storage" && (
-              <div className="flex items-center justify-center h-full text-2xl text-gray-300">
-                Storage content goes here (show storage and items).
+              <div className="p-4 h-full overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-yellow-400 [&::-webkit-scrollbar-thumb:hover]:bg-yellow-500">
+                <div className="grid grid-cols-10 gap-2">
+                  {Array.from({ length: totalStorageSlots }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="w-full aspect-square bg-gray-800/50 border border-gray-700 rounded-md flex items-center justify-center"
+                    >
+                      {/* Item will go here */}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
             {activeTab === "aquapedia" && (

@@ -89,17 +89,19 @@ app.use((req, res, next) => {
   app.get("/api/farm/characters/:userId", async (req, res) => {
     try {
       const userId = parseInt(req.params.userId);
-      const userCharacters = await storage.getFarmCharacters(userId);
+      // userCharacters are the ones the user has hired, ordered by hiring time (id)
+      const hiredCharacters = await storage.getFarmCharacters(userId);
+      hiredCharacters.sort((a, b) => a.id - b.id);
       
-      const charactersWithDetails = ALL_CHARACTERS.map(staticChar => {
-        const dbChar = userCharacters.find(db => db.characterType === staticChar.name);
+      const allCharacters = ALL_CHARACTERS.map(staticChar => {
+        const dbChar = hiredCharacters.find(db => db.characterType === staticChar.name);
         if (dbChar) {
           return { ...staticChar, hired: true, level: dbChar.level, status: dbChar.status, totalCatch: dbChar.totalCatch };
         }
         return { ...staticChar, hired: false, level: 1, status: 'Idle', totalCatch: 0 };
       });
       
-      res.json(charactersWithDetails);
+      res.json({ allCharacters, hiredCharacters });
     } catch (error) {
       res.status(500).json({ message: "Error fetching farm characters", error: (error as Error).message });
     }
