@@ -1,5 +1,5 @@
 import { pgTable, text, serial, integer, boolean, timestamp, decimal } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
@@ -47,7 +47,7 @@ export const gameResults = pgTable("game_results", {
 
 export const jackpot = pgTable("jackpot", {
   id: serial("id").primaryKey(),
-  totalPool: decimal("total_pool", { precision: 12, scale: 4 }).notNull().default("0.0000"), // Starting jackpot
+  totalPool: decimal("total_pool", { precision: 16, scale: 4 }).default("0.0000").notNull(),
   lastWinner: text("last_winner"),
   lastWonAmount: decimal("last_won_amount", { precision: 12, scale: 4 }).default("0.0000"),
   lastWonAt: timestamp("last_won_at"),
@@ -116,6 +116,8 @@ export const insertWithdrawalSchema = createInsertSchema(withdrawals).omit({
   processedAt: true,
 });
 
+export const selectWithdrawalSchema = createSelectSchema(withdrawals);
+
 export const insertFarmCharacterSchema = createInsertSchema(farmCharacters).omit({
   id: true,
 });
@@ -134,3 +136,5 @@ export type Withdrawal = typeof withdrawals.$inferSelect;
 export type InsertWithdrawal = z.infer<typeof insertWithdrawalSchema>;
 export type FarmCharacter = typeof farmCharacters.$inferSelect;
 export type InsertFarmCharacter = z.infer<typeof insertFarmCharacterSchema>;
+
+export const selectJackpotSchema = createSelectSchema(jackpot);

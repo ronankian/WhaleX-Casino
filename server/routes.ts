@@ -281,38 +281,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Game routes
   app.post("/api/games/play", async (req, res) => {
     try {
-      const { gameType, betAmount, gameData } = gamePlaySchema.parse(req.body);
-      const userId = parseInt(req.body.userId);
-      
+      const { gameType, betAmount, gameData, userId } = gamePlaySchema.parse(req.body);
+
       const wallet = await storage.getWallet(userId);
-      if (!wallet) {
-        return res.status(404).json({ message: "Wallet not found" });
+      if (!wallet || parseFloat(wallet.coins) < betAmount) {
+        return res.status(400).json({ message: "Insufficient funds" });
       }
 
-      const balance = parseFloat(wallet.coins);
-      if (balance < betAmount) {
-        return res.status(400).json({ message: "Insufficient balance" });
-      }
+      const serverSeed = crypto.randomBytes(32).toString("hex");
+      const clientSeed = gameData.clientSeed || crypto.randomBytes(32).toString("hex");
+      const nonce = gameData.nonce || 0;
 
-      // Generate provably fair seeds
-      const serverSeed = crypto.randomBytes(32).toString('hex');
-      const clientSeed = gameData.clientSeed || crypto.randomBytes(16).toString('hex');
-      const nonce = gameData.nonce || 1;
-
-      // Game logic based on type
-      let result: any = {};
-      let isWin = false;
-      let multiplier = 0;
-      let payout = 0;
-      let mobyReward = 0;
+      let result: any;
+      let gameResult: any;
 
       switch (gameType) {
         case "dice":
           const diceTarget = gameData.target || 50;
           const diceRoll = generateProvablyFairNumber(serverSeed, clientSeed, nonce, 1, 100);
-          isWin = diceRoll < diceTarget;
-          multiplier = isWin ? (99 / Math.max(1, diceTarget - 1)) : 0;
           result = { roll: diceRoll, target: diceTarget };
+          gameResult = {
+            gameType,
+            betAmount: betAmount.toString(),
+            payout: (diceRoll < diceTarget ? betAmount * (99 / Math.max(1, diceTarget - 1)) : 0).toFixed(2),
+            isWin: diceRoll < diceTarget,
+            multiplier: (diceRoll < diceTarget ? (99 / Math.max(1, diceTarget - 1)) : 0).toFixed(2),
+            result: JSON.stringify(result),
+            serverSeed,
+            clientSeed,
+            nonce
+          };
           break;
 
         case "slots":
@@ -323,9 +321,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Simple win logic - check for matching symbols
           const matches = reels.filter(symbol => symbol === reels[0]).length;
-          isWin = matches >= 3;
-          multiplier = matches >= 5 ? 1000 : matches >= 4 ? 100 : matches >= 3 ? 10 : 0;
           result = { reels, matches };
+          gameResult = {
+            gameType,
+            betAmount: betAmount.toString(),
+            payout: (matches >= 3 ? betAmount * (matches >= 5 ? 1000 : matches >= 4 ? 100 : matches >= 3 ? 10 : 0) : 0).toFixed(2),
+            isWin: matches >= 3,
+            multiplier: (matches >= 5 ? 1000 : matches >= 4 ? 100 : matches >= 3 ? 10 : 0).toFixed(2),
+            result: JSON.stringify(result),
+            serverSeed,
+            clientSeed,
+            nonce
+          };
           break;
 
         case "hilo":
@@ -333,10 +340,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const nextCard = generateProvablyFairNumber(serverSeed, clientSeed, nonce + 1, 1, 13);
           const guess = gameData.guess; // "higher" or "lower"
           
-          isWin = (guess === "higher" && nextCard > currentCard) || 
-                  (guess === "lower" && nextCard < currentCard);
-          multiplier = isWin ? Math.max(1, (gameData.streak || 0) + 1) * 1.5 : 0;
           result = { currentCard, nextCard, guess };
+          gameResult = {
+            gameType,
+            betAmount: betAmount.toString(),
+            payout: (
+              (guess === "higher" && nextCard > currentCard) || 
+              (guess === "lower" && nextCard < currentCard)
+              ? betAmount * Math.max(1, (gameData.streak || 0) + 1) * 1.5
+              : 0
+            ).toFixed(2),
+            isWin: (guess === "higher" && nextCard > currentCard) || 
+                    (guess === "lower" && nextCard < currentCard),
+            multiplier: (
+              (guess === "higher" && nextCard > currentCard) || 
+              (guess === "lower" && nextCard < currentCard)
+              ? Math.max(1, (gameData.streak || 0) + 1) * 1.5
+              : 0
+            ).toFixed(2),
+            result: JSON.stringify(result),
+            serverSeed,
+            clientSeed,
+            nonce
+          };
           break;
 
         case "mines":
@@ -351,9 +377,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             mines.push(generateProvablyFairNumber(serverSeed, clientSeed, nonce + i, 0, gridSize - 1));
           }
           
-          isWin = !mines.includes(selectedCell);
-          multiplier = isWin ? Math.pow(1.2, revealedCells.length + 1) : 0;
-          result = { selectedCell, isMine: !isWin, revealedCells: [...revealedCells, selectedCell] };
+          result = { selectedCell, isMine: !mines.includes(selectedCell), revealedCells: [...revealedCells, selectedCell] };
+          gameResult = {
+            gameType,
+            betAmount: betAmount.toString(),
+            payout: (mines.includes(selectedCell) ? 0 : betAmount * Math.pow(1.2, revealedCells.length + 1)).toFixed(2),
+            isWin: !mines.includes(selectedCell),
+            multiplier: (mines.includes(selectedCell) ? 0 : Math.pow(1.2, revealedCells.length + 1)).toFixed(2),
+            result: JSON.stringify(result),
+            serverSeed,
+            clientSeed,
+            nonce
+          };
           break;
 
         case "plinko":
@@ -369,9 +404,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const finalPosition = Math.floor(position);
           const multipliers = [1000, 130, 26, 9, 4, 2, 1.5, 1, 0.5, 1, 1.5, 2, 4, 9, 26, 130, 1000];
-          multiplier = multipliers[Math.max(0, Math.min(finalPosition, multipliers.length - 1))];
-          isWin = multiplier >= 1;
+          const multiplier = multipliers[Math.max(0, Math.min(finalPosition, multipliers.length - 1))];
           result = { ballPath, finalPosition, multiplier };
+          gameResult = {
+            gameType,
+            betAmount: betAmount.toString(),
+            payout: (multiplier >= 1 ? betAmount * multiplier : 0).toFixed(2),
+            isWin: multiplier >= 1,
+            multiplier: multiplier.toFixed(2),
+            result: JSON.stringify(result),
+            serverSeed,
+            clientSeed,
+            nonce
+          };
           break;
 
         case "roulette":
@@ -379,33 +424,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const betValue = gameData.betValue || 0;
           const winningNumber = generateProvablyFairNumber(serverSeed, clientSeed, nonce, 0, 36);
           
-          switch (betType) {
-            case "number":
-              isWin = winningNumber === betValue;
-              multiplier = isWin ? 35 : 0;
-              break;
-            case "red":
-              const redNumbers = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
-              isWin = redNumbers.includes(winningNumber);
-              multiplier = isWin ? 2 : 0;
-              break;
-            case "black":
-              const blackNumbers = [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35];
-              isWin = blackNumbers.includes(winningNumber);
-              multiplier = isWin ? 2 : 0;
-              break;
-            case "even":
-              isWin = winningNumber % 2 === 0 && winningNumber !== 0;
-              multiplier = isWin ? 2 : 0;
-              break;
-            case "odd":
-              isWin = winningNumber % 2 === 1;
-              multiplier = isWin ? 2 : 0;
-              break;
-            default:
-              multiplier = 0;
-          }
           result = { winningNumber, betType, betValue };
+          gameResult = {
+            gameType,
+            betAmount: betAmount.toString(),
+            payout: (
+              betType === "number" && winningNumber === betValue ? betAmount * 35 :
+              betType === "red" && [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(winningNumber) ? betAmount * 2 :
+              betType === "black" && [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35].includes(winningNumber) ? betAmount * 2 :
+              betType === "even" && winningNumber % 2 === 0 && winningNumber !== 0 ? betAmount * 2 :
+              betType === "odd" && winningNumber % 2 === 1 ? betAmount * 2 :
+              0
+            ).toFixed(2),
+            isWin: (
+              betType === "number" && winningNumber === betValue ||
+              betType === "red" && [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(winningNumber) ||
+              betType === "black" && [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35].includes(winningNumber) ||
+              betType === "even" && winningNumber % 2 === 0 && winningNumber !== 0 ||
+              betType === "odd" && winningNumber % 2 === 1
+            ),
+            multiplier: (
+              betType === "number" && winningNumber === betValue ? 35 :
+              betType === "red" && [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(winningNumber) ? 2 :
+              betType === "black" && [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35].includes(winningNumber) ? 2 :
+              betType === "even" && winningNumber % 2 === 0 && winningNumber !== 0 ? 2 :
+              betType === "odd" && winningNumber % 2 === 1 ? 2 :
+              0
+            ).toFixed(2),
+            result: JSON.stringify(result),
+            serverSeed,
+            clientSeed,
+            nonce
+          };
           break;
 
         case "crash":
@@ -413,58 +463,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const cashOutPoint = gameData.cashOut !== undefined ? gameData.cashOut : 1.0;
           
           // If cashOut is 0, it means the game crashed before cash out (loss)
-          isWin = cashOutPoint > 0 && cashOutPoint <= crashPoint;
-          multiplier = isWin ? cashOutPoint : 0;
           result = { crashPoint, cashOut: cashOutPoint };
+          gameResult = {
+            gameType,
+            betAmount: betAmount.toString(),
+            payout: (cashOutPoint > 0 && cashOutPoint <= crashPoint ? cashOutPoint : 0).toFixed(2),
+            isWin: cashOutPoint > 0 && cashOutPoint <= crashPoint,
+            multiplier: (cashOutPoint > 0 && cashOutPoint <= crashPoint ? cashOutPoint : 0).toFixed(2),
+            result: JSON.stringify(result),
+            serverSeed,
+            clientSeed,
+            nonce
+          };
           break;
       }
 
-      payout = isWin ? betAmount * multiplier : 0;
-      
-      // 0-10% chance to win MOBY tokens
-      if (isWin && Math.random() < 0.1) {
-        mobyReward = betAmount * 0.0002; // 1 coin = 0.0002 MOBY (1/5000)
-      }
+      // Update wallet based on win/loss
+      const newBalance = parseFloat(wallet.coins) + (gameResult.payout - betAmount);
+      await storage.updateWallet(userId, { coins: newBalance.toFixed(2) });
 
-      // Update wallet
-      const newBalance = balance - betAmount + payout;
-      const newMobyBalance = parseFloat(wallet.mobyTokens) + mobyReward;
-      
-      // Add lost bet amount to jackpot (convert coins to MOBY tokens)
-      if (!isWin && betAmount > 0) {
-        const jackpotContribution = betAmount * 0.0002; // 1 coin = 0.0002 MOBY (1/5000)
+      // Add to jackpot if it's a loss
+      if (!gameResult.isWin && betAmount > 0) {
+        const jackpotContribution = betAmount * 0.10; // 10% contribution
         await storage.addToJackpot(jackpotContribution);
       }
-      
-      await storage.updateWallet(userId, {
-        coins: newBalance.toFixed(2),
-        mobyTokens: newMobyBalance.toFixed(4)
-      });
 
-      // Record game result
-      const gameResult = await storage.createGameResult({
+      // Save game result to DB
+      await storage.createGameResult({
         userId,
-        gameId: 1,
         gameType,
         betAmount: betAmount.toString(),
-        payout: payout.toFixed(2),
-        multiplier: multiplier.toFixed(2),
-        result: JSON.stringify(result),
-        isWin,
-        mobyReward: mobyReward.toFixed(4),
-        serverSeed,
+        payout: gameResult.payout.toString(),
+        isWin: gameResult.isWin,
         clientSeed,
-        nonce
+        serverSeed,
+        nonce,
       });
 
       res.json({
+        result,
         gameResult,
-        wallet: await storage.getWallet(userId),
-        result
+        newBalance: newBalance.toFixed(2),
       });
+
     } catch (error) {
       console.error("Game play error:", error);
-      res.status(400).json({ message: "Invalid game data" });
+      res.status(400).json({ message: "Invalid game play data" });
     }
   });
 
@@ -525,10 +569,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Jackpot routes
   app.get("/api/jackpot", async (req, res) => {
     try {
-      const jackpotData = await storage.getJackpot();
-      res.json(jackpotData);
+      const currentJackpot = await storage.getJackpot();
+      res.json(currentJackpot);
     } catch (error) {
-      res.status(500).json({ message: "Failed to get jackpot" });
+      res.status(500).json({ message: "Error fetching jackpot" });
     }
   });
 

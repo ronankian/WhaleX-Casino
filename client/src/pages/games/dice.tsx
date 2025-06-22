@@ -1,17 +1,17 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import GameLayout from "@/components/games/game-layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
-import { Badge } from "@/components/ui/badge";
+import { useAuth } from "../../hooks/use-auth";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "../../lib/queryClient";
+import GameLayout from "../../components/games/game-layout";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Slider } from "../../components/ui/slider";
+import { Badge } from "../../components/ui/badge";
 import { Dices, Shield } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { calculateDiceWinChance, calculateDiceMultiplier, generateClientSeed, formatCurrency, BET_AMOUNTS } from "@/lib/game-utils";
+import { useToast } from "../../hooks/use-toast";
+import { calculateDiceWinChance, calculateDiceMultiplier, generateClientSeed, formatCurrency, BET_AMOUNTS } from "../../lib/game-utils";
 
 export default function DiceGame() {
   const [, setLocation] = useLocation();

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "../../hooks/use-auth";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "../../lib/queryClient";
 import GameLayout from "../../components/games/game-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -575,10 +575,18 @@ export default function CrashGame() {
                 </div>
               )}
               <div className="text-center relative z-30">
-                <h1 className={`font-mono text-7xl lg:text-9xl font-bold transition-colors crash-text-shadow ${crashed ? "text-red-500" : "text-white"}`}>
+                <h1 className={`font-mono text-7xl lg:text-9xl font-bold transition-colors ${
+                  crashed ? "text-red-500" : "text-white crash-text-shadow"
+                }`} style={{
+                  textShadow: crashed ? 
+                    '2px 2px 4px rgba(0, 0, 0, 0.8), -1px -1px 2px rgba(0, 0, 0, 0.6), 1px -1px 2px rgba(0, 0, 0, 0.6), -1px 1px 2px rgba(0, 0, 0, 0.6), 0 0 8px rgba(255, 0, 0, 0.3)' : 
+                    undefined
+                }}>
                   {gameActive ? `${currentMultiplier.toFixed(2)}x` : (crashed && crashPoint ? `${crashPoint.toFixed(2)}x` : '1.00x')}
                 </h1>
-                {crashed && <p className="text-red-500 text-2xl font-bold mt-4 crash-text-shadow">CRASHED</p>}
+                {crashed && <p className="text-red-500 text-2xl font-bold mt-4" style={{
+                  textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8), -1px -1px 2px rgba(0, 0, 0, 0.6), 1px -1px 2px rgba(0, 0, 0, 0.6), -1px 1px 2px rgba(0, 0, 0, 0.6), 0 0 8px rgba(255, 0, 0, 0.3)'
+                }}>CRASHED</p>}
                 {!gameActive && !crashed && !hasBet && <p className="text-zinc-200 text-lg font-bold mt-4 crash-text-shadow">Waiting for next round...</p>}
               </div>
             </div>

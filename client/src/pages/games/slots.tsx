@@ -1,15 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import GameLayout from "@/components/games/game-layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RotateCcw } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { generateClientSeed, formatCurrency, SLOT_SYMBOLS } from "@/lib/game-utils";
+import { useAuth } from "../../hooks/use-auth";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "../../lib/queryClient";
+import GameLayout from "../../components/games/game-layout";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { RotateCcw, DollarSign, Zap } from "lucide-react";
+import { useToast } from "../../hooks/use-toast";
+import { generateClientSeed, formatCurrency, SLOT_SYMBOLS, BET_AMOUNTS } from "../../lib/game-utils";
 
 export default function SlotsGame() {
   const [, setLocation] = useLocation();
@@ -47,10 +47,16 @@ export default function SlotsGame() {
       setLastWin(parseFloat(data.gameResult.payout));
       refreshWallet();
       
-      if (data.gameResult.isWin) {
+      if (data.gameResult.payout > 0) {
         toast({
-          title: "🎉 Slot Win!",
-          description: `${data.result.matches} matching symbols! Won ${formatCurrency(data.gameResult.payout)} coins`,
+          title: "🎉 You Won!",
+          description: `You won ${formatCurrency(data.gameResult.payout)} coins!`,
+        });
+      } else {
+        toast({
+          title: "Try Again!",
+          description: "No win this time. Better luck next spin!",
+          variant: "destructive",
         });
       }
 

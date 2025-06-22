@@ -1,16 +1,16 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "../../hooks/use-auth";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import GameLayout from "@/components/games/game-layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { apiRequest } from "../../lib/queryClient";
+import GameLayout from "../../components/games/game-layout";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Badge } from "../../components/ui/badge";
 import { Bomb, Gem, DollarSign } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { generateClientSeed, formatCurrency, BET_AMOUNTS } from "@/lib/game-utils";
+import { useToast } from "../../hooks/use-toast";
+import { generateClientSeed, formatCurrency, BET_AMOUNTS } from "../../lib/game-utils";
 
 export default function MinesGame() {
   const [, setLocation] = useLocation();
@@ -43,7 +43,7 @@ export default function MinesGame() {
       return response.json();
     },
     onSuccess: (data) => {
-      const { selectedCell, isMine, revealedCells: newRevealed } = data.result;
+      const { isMine, revealedCells: newRevealed } = data.result;
       
       if (isMine) {
         toast({
@@ -113,9 +113,10 @@ export default function MinesGame() {
   const potentialPayout = betAmount * multiplier;
 
   const handleCellClick = (cellIndex: number) => {
-    if (!gameActive || revealedCells.includes(cellIndex)) return;
+    if (revealedCells.includes(cellIndex)) return;
     
     if (!gameActive) {
+        if(!canPlay) return;
       setGameActive(true);
     }
 
@@ -135,7 +136,7 @@ export default function MinesGame() {
     }
   };
 
-  const handleNewGame = () => {
+  const handleStartGame = () => {
     setGameActive(false);
     setRevealedCells([]);
     setMultiplier(1);
@@ -154,7 +155,7 @@ export default function MinesGame() {
                     <button
                       key={i}
                       onClick={() => handleCellClick(i)}
-                      disabled={!canPlay && !gameActive}
+                      disabled={ (gameActive && revealedCells.includes(i)) || playGameMutation.isPending}
                       className={`aspect-square rounded-lg border-2 transition-all duration-200 flex items-center justify-center text-2xl ${
                         revealedCells.includes(i)
                           ? "bg-emerald-500 border-emerald-400 animate-glow"
@@ -243,25 +244,24 @@ export default function MinesGame() {
                 </CardContent>
               </Card>
 
-              {gameActive && revealedCells.length > 0 ? (
+              {gameActive ? (
                 <Button
                   onClick={handleCashOut}
-                  disabled={cashOutMutation.isPending}
-                  className="w-full py-4 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-white font-semibold text-lg animate-glow"
+                  disabled={cashOutMutation.isPending || revealedCells.length === 0}
+                  className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold text-lg animate-glow"
                 >
                   <DollarSign className="mr-2 h-5 w-5" />
                   Cash Out ({formatCurrency(potentialPayout)})
                 </Button>
               ) : (
                 <Button
-                  onClick={handleNewGame}
-                  disabled={!canPlay && !gameActive}
-                  className="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold"
+                  onClick={handleStartGame}
+                  disabled={!canPlay}
+                  className="w-full py-4 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-white font-semibold text-lg"
                 >
-                  {gameActive ? "Continue Playing" : "Start Game"}
+                  Start Game
                 </Button>
               )}
-
               {!canPlay && betAmount > parseFloat(wallet.coins) && (
                 <p className="text-red-400 text-sm text-center">
                   Insufficient balance

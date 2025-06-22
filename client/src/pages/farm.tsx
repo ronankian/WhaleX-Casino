@@ -309,7 +309,7 @@ export default function FarmPage() {
               </>
             )}
             {activeTab === "storage" && (
-              <div className="p-4 h-full overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-yellow-400 [&::-webkit-scrollbar-thumb:hover]:bg-yellow-500">
+              <div className="absolute inset-0 p-4 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-yellow-400 [&::-webkit-scrollbar-thumb:hover]:bg-yellow-500">
                 <div className="grid grid-cols-10 gap-2">
                   {Array.from({ length: totalStorageSlots }).map((_, index) => (
                     <div
@@ -323,8 +323,17 @@ export default function FarmPage() {
               </div>
             )}
             {activeTab === "aquapedia" && (
-              <div className="flex items-center justify-center h-full text-2xl text-gray-300">
-                Aquapedia content goes here (show caught items).
+              <div className="absolute inset-0 p-4 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-yellow-400 [&::-webkit-scrollbar-thumb:hover]:bg-yellow-500">
+                <div className="grid grid-cols-10 gap-2">
+                  {Array.from({ length: 80 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="w-full aspect-square border rounded-md flex items-center justify-center bg-black/50 border-gray-800"
+                    >
+                      <LockIcon className="w-6 h-6 text-gray-600" />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -408,6 +417,26 @@ function StarIcon(props: React.SVGProps<SVGSVGElement>) {
       strokeLinejoin="round"
     >
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  );
+}
+
+function LockIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
     </svg>
   );
 }

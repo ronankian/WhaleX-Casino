@@ -49,13 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { data: walletData, error: walletError } = useQuery({
     queryKey: ["/api/wallet/" + user?.id],
     enabled: !!user?.id,
-    refetchInterval: false, // Disable automatic refresh during development
+    refetchInterval: false,
     retry: 1,
   });
 
   useEffect(() => {
     if (walletError) {
-      // If fetching the wallet fails (e.g., 404), log the user out
       logout();
     }
   }, [walletError]);
@@ -76,15 +75,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [walletData]);
 
   useEffect(() => {
-    // Load user from localStorage on app start
     const savedUser = localStorage.getItem("whalex_user");
     const savedWallet = localStorage.getItem("whalex_wallet");
     
-    console.log("Auth: Loading from localStorage. Saved user string:", savedUser);
-    
     if (savedUser && savedWallet) {
       const parsedUser = JSON.parse(savedUser);
-      console.log("Auth: Parsed user object from localStorage:", parsedUser);
       setUser(parsedUser);
       setWallet(JSON.parse(savedWallet));
     }
