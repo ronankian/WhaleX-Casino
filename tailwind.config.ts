@@ -2,7 +2,12 @@ import type { Config } from "tailwindcss";
 
 export default {
   darkMode: ["class"],
-  content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
+  content: [
+    "./client/index.html", 
+    "./client/src/**/*.{js,jsx,ts,tsx}"
+  ],
+  // Enable JIT mode for faster builds
+  mode: "jit",
   theme: {
     extend: {
       borderRadius: {
@@ -139,4 +144,8 @@ export default {
     require("tailwindcss-animate"),
     require("tailwind-scrollbar")({ nocompatible: true }),
   ],
+  // Performance optimizations
+  future: {
+    hoverOnlyWhenSupported: true,
+  },
 } satisfies Config;

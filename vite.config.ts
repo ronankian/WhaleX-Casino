@@ -38,6 +38,22 @@ export default defineConfig({
         target: 'http://localhost:5000',
         changeOrigin: true,
       },
-    }
+    },
+    hmr: {
+      overlay: false,
+    },
+  },
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'wagmi',
+      '@tanstack/react-query',
+      'framer-motion',
+    ],
+    exclude: ['@replit/vite-plugin-cartographer'],
+  },
+  css: {
+    devSourcemap: false,
   },
 });

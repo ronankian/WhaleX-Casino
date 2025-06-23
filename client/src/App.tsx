@@ -11,7 +11,6 @@ import Landing from "./pages/landing";
 import Home from "./pages/home";
 import Casino from "./pages/casino";
 import Farm from "./pages/farm";
-import About from "./pages/about";
 import DiceGame from "./pages/games/dice";
 import SlotsGame from "./pages/games/slots";
 import HiLoGame from "./pages/games/hilo";
@@ -35,7 +34,6 @@ function Router() {
       <Route path="/register" component={Register} />
       <Route path="/casino" component={Casino} />
       <Route path="/farm" component={Farm} />
-      <Route path="/about" component={About} />
       <Route path="/games/dice" component={DiceGame} />
       <Route path="/games/slots" component={SlotsGame} />
       <Route path="/games/hilo" component={HiLoGame} />
