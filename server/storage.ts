@@ -2,11 +2,11 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import { eq, desc, and } from "drizzle-orm";
 import {
-  users, wallets, gameResults, deposits, withdrawals, jackpot, farmCharacters,
+  users, wallets, gameResults, deposits, withdrawals, jackpot, farmCharacters, farmInventory,
   type User, type InsertUser, type Wallet, type InsertWallet,
   type GameResult, type InsertGameResult, type Deposit, type InsertDeposit,
   type Withdrawal, type InsertWithdrawal, type Jackpot, type InsertJackpot,
-  type FarmCharacter, type InsertFarmCharacter
+  type FarmCharacter, type InsertFarmCharacter, type FarmInventory, type InsertFarmInventory
 } from "@shared/schema";
 
 if (!process.env.DATABASE_URL) {
@@ -53,6 +53,18 @@ export interface IStorage {
   getFarmCharacter(userId: number, characterType: string): Promise<FarmCharacter | undefined>;
   createFarmCharacter(character: InsertFarmCharacter): Promise<FarmCharacter>;
   updateFarmCharacter(id: number, updates: Partial<FarmCharacter>): Promise<FarmCharacter | undefined>;
+
+  // Farm Inventory operations
+  getFarmInventory(userId: number): Promise<FarmInventory[]>;
+  getFarmInventoryItem(inventoryId: number): Promise<FarmInventory | undefined>;
+  findFarmInventoryItem(userId: number, itemId: string): Promise<FarmInventory | undefined>;
+  addFarmInventoryItem(item: InsertFarmInventory): Promise<FarmInventory>;
+  addOrUpdateFarmInventoryItem(item: InsertFarmInventory): Promise<FarmInventory>;
+  updateFarmInventoryItem(id: number, updates: Partial<FarmInventory>): Promise<FarmInventory | undefined>;
+  deleteFarmInventoryItem(id: number): Promise<{ id: number }>;
+
+  // Level stats operations
+  getLevelStats(): Promise<any[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -202,6 +214,80 @@ export class DbStorage implements IStorage {
   async updateFarmCharacter(id: number, updates: Partial<FarmCharacter>): Promise<FarmCharacter | undefined> {
     const result = await db.update(farmCharacters).set(updates).where(eq(farmCharacters.id, id)).returning();
     return result[0];
+  }
+
+  async getFarmInventory(userId: number): Promise<FarmInventory[]> {
+    return db.select().from(farmInventory).where(eq(farmInventory.userId, userId)).orderBy(desc(farmInventory.caughtAt));
+  }
+
+  async getFarmInventoryItem(inventoryId: number): Promise<FarmInventory | undefined> {
+    const result = await db.select().from(farmInventory).where(eq(farmInventory.id, inventoryId));
+    return result[0];
+  }
+
+  async findFarmInventoryItem(userId: number, itemId: string): Promise<FarmInventory | undefined> {
+    const result = await db.select().from(farmInventory)
+      .where(and(eq(farmInventory.userId, userId), eq(farmInventory.itemId, itemId), eq(farmInventory.locked, false)));
+    return result[0];
+  }
+
+  async addFarmInventoryItem(item: InsertFarmInventory): Promise<FarmInventory> {
+    const result = await db.insert(farmInventory).values(item).returning();
+    return result[0];
+  }
+
+  async updateFarmInventoryItem(id: number, updates: Partial<FarmInventory>): Promise<FarmInventory | undefined> {
+    const result = await db.update(farmInventory).set(updates).where(eq(farmInventory.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteFarmInventoryItem(id: number): Promise<{ id: number }> {
+    const result = await db.delete(farmInventory).where(eq(farmInventory.id, id)).returning({ id: farmInventory.id });
+    return result[0];
+  }
+
+  async addOrUpdateFarmInventoryItem(item: InsertFarmInventory): Promise<FarmInventory> {
+    const existingItem = await this.findFarmInventoryItem(item.userId, item.itemId);
+    
+    if (existingItem) {
+      const updatedItem = await this.updateFarmInventoryItem(existingItem.id, {
+        quantity: existingItem.quantity + (item.quantity || 1),
+      });
+      return updatedItem!;
+    } else {
+      return this.addFarmInventoryItem(item);
+    }
+  }
+
+  async getLevelStats(): Promise<any[]> {
+    // Return level statistics for characters (fish per minute and bonus chance)
+    return [
+      { level: 1, fishPerMin: 1, bonusChance: 0.5 },
+      { level: 2, fishPerMin: 1.2, bonusChance: 1.0 },
+      { level: 3, fishPerMin: 1.4, bonusChance: 1.5 },
+      { level: 4, fishPerMin: 1.6, bonusChance: 2.0 },
+      { level: 5, fishPerMin: 1.8, bonusChance: 2.5 },
+      { level: 6, fishPerMin: 2.0, bonusChance: 3.0 },
+      { level: 7, fishPerMin: 2.2, bonusChance: 3.5 },
+      { level: 8, fishPerMin: 2.4, bonusChance: 4.0 },
+      { level: 9, fishPerMin: 2.6, bonusChance: 4.5 },
+      { level: 10, fishPerMin: 2.8, bonusChance: 5.0 },
+      { level: 11, fishPerMin: 3.0, bonusChance: 5.5 },
+      { level: 12, fishPerMin: 3.2, bonusChance: 6.0 },
+      { level: 13, fishPerMin: 3.4, bonusChance: 6.5 },
+      { level: 14, fishPerMin: 3.6, bonusChance: 7.0 },
+      { level: 15, fishPerMin: 3.8, bonusChance: 7.5 },
+      { level: 16, fishPerMin: 4.0, bonusChance: 8.0 },
+      { level: 17, fishPerMin: 4.2, bonusChance: 8.5 },
+      { level: 18, fishPerMin: 4.4, bonusChance: 9.0 },
+      { level: 19, fishPerMin: 4.6, bonusChance: 9.5 },
+      { level: 20, fishPerMin: 4.8, bonusChance: 10.0 },
+      { level: 21, fishPerMin: 5.0, bonusChance: 10.5 },
+      { level: 22, fishPerMin: 5.2, bonusChance: 11.0 },
+      { level: 23, fishPerMin: 5.4, bonusChance: 11.5 },
+      { level: 24, fishPerMin: 5.6, bonusChance: 12.0 },
+      { level: 25, fishPerMin: 5.8, bonusChance: 12.5 },
+    ];
   }
 }
 

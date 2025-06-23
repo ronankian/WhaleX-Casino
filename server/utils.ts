@@ -21,4 +21,56 @@ export function verifyPassword(password: string, hash: string): Promise<boolean>
       resolve(key === derivedKey.toString("hex"));
     });
   });
+}
+
+export enum Method {
+  GET = "GET",
+  POST = "POST",
+  PUT = "PUT",
+  DELETE = "DELETE",
+}
+
+export interface IRequest {
+  method: Method;
+  path: string;
+  body?: any;
+  user?: any;
+}
+
+export interface IResponse {
+  statusCode: number;
+  body: any;
+}
+
+export class Api {
+  static ok(body: any): IResponse {
+    return { statusCode: 200, body };
+  }
+
+  static badRequest(message: string): IResponse {
+    return { statusCode: 400, body: { message } };
+  }
+
+  static unauthorized(): IResponse {
+    return { statusCode: 401, body: { message: "Unauthorized" } };
+  }
+
+  static notFound(message: string): IResponse {
+    return { statusCode: 404, body: { message } };
+  }
+
+  static internalError(message: string): IResponse {
+    return { statusCode: 500, body: { message } };
+  }
+}
+
+export interface IHandler {
+  method?: Method;
+  path?: string;
+  canHandle(request: IRequest): boolean;
+  handle(request: IRequest): Promise<IResponse>;
+}
+
+export function log(message: string) {
+  console.log(`[${new Date().toISOString()}] ${message}`);
 } 

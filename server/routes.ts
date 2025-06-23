@@ -5,6 +5,7 @@ import { insertUserSchema, insertGameResultSchema, insertDepositSchema, insertWi
 import { storage } from "./storage.js";
 import crypto from "crypto";
 import { hashPassword, verifyPassword } from "./utils.js";
+import { FARM_ITEMS, getRandomItem } from "./farm-items.js";
 
 const loginSchema = z.object({
   username: z.string().min(1),
@@ -185,11 +186,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = parseInt(req.params.userId);
       const userCharacters = await storage.getFarmCharacters(userId);
       
-      const charactersWithDetails = ALL_CHARACTERS.map(staticChar => {
-        const dbChar = userCharacters.find(db => db.characterType === staticChar.name);
+      const allCharacters = ALL_CHARACTERS.map(staticChar => {
+        const { name, ...rest } = staticChar;
+        const dbChar = userCharacters.find(db => db.characterType === name);
         if (dbChar) {
           return {
-            ...staticChar,
+            ...rest,
+            characterType: name,
+            id: dbChar.id,
             hired: true,
             level: dbChar.level,
             status: dbChar.status,
@@ -197,15 +201,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         }
         return {
-          ...staticChar,
+          ...rest,
+          characterType: name,
+          id: null,
           hired: false,
           level: 1,
           status: 'Idle',
           totalCatch: 0,
         };
       });
+
+      const hiredCharacters = allCharacters.filter(char => char.hired);
       
-      res.json(charactersWithDetails);
+      res.json({
+        allCharacters,
+        hiredCharacters
+      });
     } catch (error) {
       res.status(500).json({ message: "Error fetching farm characters", error: (error as Error).message });
     }
@@ -275,6 +286,168 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedCharacter);
     } catch (error) {
       res.status(400).json({ message: "Invalid level-up request", error: (error as Error).message });
+    }
+  });
+
+  // Start fishing for all hired characters
+  app.post("/api/farm/start-fishing", async (req, res) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      // Get all hired characters for the user
+      const characters = await storage.getFarmCharacters(userId);
+      const hiredCharacters = characters.filter(char => char.hired);
+
+      if (hiredCharacters.length === 0) {
+        return res.status(400).json({ message: "No hired characters to start fishing" });
+      }
+
+      // Check storage capacity
+      const inventory = await storage.getFarmInventory(userId);
+      const totalStorageSlots = hiredCharacters.reduce((acc, char) => {
+        let slots = 30;
+        if (char.level >= 25) slots += 5;
+        if (char.level >= 20) slots += 5;
+        if (char.level >= 15) slots += 5;
+        if (char.level >= 10) slots += 5;
+        if (char.level >= 5) slots += 10;
+        return acc + slots;
+      }, 0);
+
+      if (inventory.length >= totalStorageSlots) {
+        return res.status(400).json({ message: "Storage is full. Cannot start fishing." });
+      }
+
+      // Update all characters to fishing status
+      for (const character of hiredCharacters) {
+        await storage.updateFarmCharacter(character.id, { status: 'Fishing' });
+      }
+
+      res.json({ message: "Fishing started for all hired characters" });
+    } catch (error) {
+      res.status(500).json({ message: "Error starting fishing", error: (error as Error).message });
+    }
+  });
+
+  // Stop fishing for all hired characters
+  app.post("/api/farm/stop-fishing", async (req, res) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      // Get all hired characters for the user
+      const characters = await storage.getFarmCharacters(userId);
+      const hiredCharacters = characters.filter(char => char.hired);
+
+      // Update all characters to idle status
+      for (const character of hiredCharacters) {
+        await storage.updateFarmCharacter(character.id, { status: 'Idle' });
+      }
+
+      res.json({ message: "Fishing stopped for all hired characters" });
+    } catch (error) {
+      res.status(500).json({ message: "Error stopping fishing", error: (error as Error).message });
+    }
+  });
+
+  // Process fishing catches (called by a cron job or timer)
+  app.post("/api/farm/process-catches", async (req, res) => {
+    try {
+      const { userId } = z.object({ userId: z.number() }).parse(req.body);
+
+      const fishingCharacters = await storage.getFishingCharacters(userId);
+      if (fishingCharacters.length === 0) {
+        return res.json({ newCatches: [] });
+      }
+
+      // Calculate total storage capacity
+      const totalStorageSlots = fishingCharacters.reduce((acc, char) => {
+        const staticChar = ALL_CHARACTERS.find(c => c.name === char.characterType);
+        return acc + (staticChar?.getStorageSlots(char.level) || 0);
+      }, 0);
+      
+      const inventory = await storage.getFarmInventory(userId);
+      let currentStorageUsed = inventory.reduce((acc, item) => acc + item.quantity, 0);
+      let availableSpace = totalStorageSlots - currentStorageUsed;
+      
+      if (availableSpace <= 0) {
+        // If storage is already full, stop all characters and return.
+        await storage.stopAllFishing(userId);
+        return res.json({ newCatches: [], message: "Storage is full. Fishing stopped." });
+      }
+
+      const newCatches: any[] = [];
+      let storageBecameFull = false;
+
+      for (const character of fishingCharacters) {
+        const staticChar = ALL_CHARACTERS.find(c => c.name === character.characterType);
+        if (!staticChar) continue;
+
+        const levelStats = LEVEL_STATS[character.level - 1];
+        if (!levelStats) continue;
+
+        // --- Catch Logic ---
+        const itemsToCatch = Math.floor(levelStats.fishPerMin);
+        for (let i = 0; i < itemsToCatch; i++) {
+          if (availableSpace <= 0) {
+            storageBecameFull = true;
+            break;
+          }
+          
+          const caughtItem = getRandomItem(levelStats.bonusChance);
+          if (caughtItem) {
+            await storage.addOrUpdateFarmInventory(userId, caughtItem.id, 1);
+            await storage.incrementTotalCatch(character.id, 1);
+            
+            newCatches.push({
+              characterType: character.characterType,
+              profileImg: staticChar.profileImg,
+              itemName: caughtItem.name,
+              itemImage: caughtItem.image,
+              rarity: caughtItem.rarity,
+            });
+            availableSpace--;
+            currentStorageUsed++;
+          }
+        }
+        if (storageBecameFull) break;
+      }
+      
+      if (currentStorageUsed >= totalStorageSlots) {
+        await storage.stopAllFishing(userId);
+      }
+
+      res.json({ newCatches });
+    } catch (error) {
+      console.error('Error processing catches:', error);
+      res.status(500).json({ message: "Failed to process catches." });
+    }
+  });
+
+  // Get level stats
+  app.get("/api/farm/level-stats", async (req, res) => {
+    try {
+      const levelStats = await storage.getLevelStats();
+      res.json(levelStats);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching level stats", error: (error as Error).message });
+    }
+  });
+
+  // Get farm inventory
+  app.get("/api/farm/inventory/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const inventory = await storage.getFarmInventory(userId);
+      res.json(inventory);
+    } catch (error) {
+      console.error("Detailed error fetching inventory:", error);
+      res.status(500).json({ message: "Error fetching inventory", error: (error as Error).message });
     }
   });
 

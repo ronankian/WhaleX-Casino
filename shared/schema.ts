@@ -47,7 +47,7 @@ export const gameResults = pgTable("game_results", {
 
 export const jackpot = pgTable("jackpot", {
   id: serial("id").primaryKey(),
-  totalPool: decimal("total_pool", { precision: 16, scale: 4 }).default("0.0000").notNull(),
+  totalPool: decimal("total_pool", { precision: 12, scale: 4 }).default("0.0000").notNull(),
   lastWinner: text("last_winner"),
   lastWonAmount: decimal("last_won_amount", { precision: 12, scale: 4 }).default("0.0000"),
   lastWonAt: timestamp("last_won_at"),
@@ -85,6 +85,15 @@ export const farmCharacters = pgTable("farm_characters", {
   totalCatch: integer("total_catch").notNull().default(0),
 });
 
+export const farmInventory = pgTable("farm_inventory", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  itemId: text("item_id").notNull(), // References the item ID from farm-items.ts
+  quantity: integer("quantity").notNull().default(1),
+  locked: boolean("locked").notNull().default(false),
+  caughtAt: timestamp("caught_at").notNull().defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   joinDate: true,
@@ -116,9 +125,11 @@ export const insertWithdrawalSchema = createInsertSchema(withdrawals).omit({
   processedAt: true,
 });
 
-export const selectWithdrawalSchema = createSelectSchema(withdrawals);
-
 export const insertFarmCharacterSchema = createInsertSchema(farmCharacters).omit({
+  id: true,
+});
+
+export const insertFarmInventorySchema = createInsertSchema(farmInventory).omit({
   id: true,
 });
 
@@ -136,5 +147,7 @@ export type Withdrawal = typeof withdrawals.$inferSelect;
 export type InsertWithdrawal = z.infer<typeof insertWithdrawalSchema>;
 export type FarmCharacter = typeof farmCharacters.$inferSelect;
 export type InsertFarmCharacter = z.infer<typeof insertFarmCharacterSchema>;
+export type FarmInventory = typeof farmInventory.$inferSelect;
+export type InsertFarmInventory = z.infer<typeof insertFarmInventorySchema>;
 
 export const selectJackpotSchema = createSelectSchema(jackpot);

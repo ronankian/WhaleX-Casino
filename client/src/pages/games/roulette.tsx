@@ -137,8 +137,8 @@ export default function RouletteGame() {
                                  <p>You {result.payout > 0 ? `won ${formatCurrency(result.payout)}` : 'lost'}</p>
                   </div>
                 )}
-                  </CardContent>
-                </Card>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </GameLayout>

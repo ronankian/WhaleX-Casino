@@ -4,6 +4,8 @@ import { z } from "zod";
 import { storage } from "./storage.js";
 import { registerRoutes } from "./routes.js";
 import { setupVite, serveStatic, log } from "./vite.js";
+import { Api, IRequest, IResponse, Method } from "./utils";
+import { FARM_ITEMS } from "./farm-items";
 
 const app = express();
 app.use(express.json());
@@ -84,110 +86,150 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
-  // Farm Game Routes
-  app.get("/api/farm/characters/:userId", async (req, res) => {
-    try {
-      const userId = parseInt(req.params.userId);
-      // userCharacters are the ones the user has hired, ordered by hiring time (id)
-      const hiredCharacters = await storage.getFarmCharacters(userId);
-      hiredCharacters.sort((a, b) => a.id - b.id);
-      
-      const allCharacters = ALL_CHARACTERS.map(staticChar => {
-        const dbChar = hiredCharacters.find(db => db.characterType === staticChar.name);
-        if (dbChar) {
-          return { ...staticChar, hired: true, level: dbChar.level, status: dbChar.status, totalCatch: dbChar.totalCatch };
-        }
-        return { ...staticChar, hired: false, level: 1, status: 'Idle', totalCatch: 0 };
-      });
-      
-      res.json({ allCharacters, hiredCharacters });
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching farm characters", error: (error as Error).message });
-    }
-  });
-
-  app.get("/api/farm/level-stats", (_req, res) => {
-    try {
-      res.json(LEVEL_STATS);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching level stats", error: (error as Error).message });
-    }
-  });
-
-  app.post("/api/farm/hire", async (req, res) => {
-    try {
-      const { userId, characterType } = farmActionSchema.parse(req.body);
-      const wallet = await storage.getWallet(userId);
-      if (!wallet) return res.status(404).json({ message: "Wallet not found" });
-
-      const userCharacters = await storage.getFarmCharacters(userId);
-      const numHired = userCharacters.length;
-      if (numHired >= HIRE_COSTS.length) return res.status(400).json({ message: "No more characters to hire" });
-      
-      const hireCost = HIRE_COSTS[numHired];
-      const balance = parseFloat(wallet.coins);
-      if (balance < hireCost) return res.status(400).json({ message: "Insufficient coins to hire" });
-
-      await storage.updateWallet(userId, { coins: (balance - hireCost).toFixed(2) });
-      const newCharacter = await storage.createFarmCharacter({ userId, characterType, hired: true, level: 1 });
-
-      res.status(201).json(newCharacter);
-    } catch (error) {
-      res.status(400).json({ message: "Invalid hire request", error: (error as Error).message });
-    }
-  });
-
-  app.post("/api/farm/level-up", async (req, res) => {
-    try {
-      const { userId, characterType } = farmActionSchema.parse(req.body);
-      const character = await storage.getFarmCharacter(userId, characterType);
-      const wallet = await storage.getWallet(userId);
-      if (!character || !wallet) return res.status(404).json({ message: "Character or wallet not found" });
-      if (character.level >= 25) return res.status(400).json({ message: "Character is at max level" });
-
-      const levelUpCost = LEVEL_UP_COSTS[character.level - 1];
-      const mobyBalance = parseFloat(wallet.mobyTokens);
-      if (mobyBalance < levelUpCost) return res.status(400).json({ message: "Insufficient $MOBY to level up" });
-
-      await storage.updateWallet(userId, { mobyTokens: (mobyBalance - levelUpCost).toFixed(4) });
-      const updatedCharacter = await storage.updateFarmCharacter(character.id, { level: character.level + 1 });
-      
-      res.json(updatedCharacter);
-    } catch (error) {
-      res.status(400).json({ message: "Invalid level-up request", error: (error as Error).message });
-    }
-  });
-
-  const server = await registerRoutes(app);
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+class FarmCharactersHandler implements IHandler {
+  canHandle(request: IRequest): boolean {
+    return this.method === Method.GET && this.path.startsWith("/api/farm/characters");
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = process.env.PORT ? parseInt(process.env.PORT) : 5000;
-  server.listen(port, '0.0.0.0', () => {
-    log(`serving on port ${port}`);
-  });
+  async handle(request: IRequest): Promise<IResponse> {
+    const userId = parseInt(this.path.split("/")[4], 10);
+    if (isNaN(userId)) {
+      return Api.badRequest("Invalid user ID");
+    }
+    const characters = await storage.getFarmCharacters(userId);
+    return Api.ok(characters);
+  }
+}
 
-  // Handle graceful shutdown
-   process.on('SIGINT', async () => {
-     process.exit(0);
-   });
-})();
+class FarmInventoryHandler implements IHandler {
+  get method() { return Method.POST; }
+
+  canHandle(request: IRequest): boolean {
+    return request.path.startsWith("/api/farm/inventory");
+  }
+
+  async handle(request: IRequest): Promise<IResponse> {
+    const userId = request.user?.id;
+    if (!userId) {
+      return Api.unauthorized();
+    }
+
+    if (request.method === Method.GET) {
+      const inventory = await storage.getFarmInventory(userId);
+      return Api.ok(inventory);
+    }
+
+    const { action, inventoryId, quantity } = request.body;
+
+    if (!action || !inventoryId) {
+      return Api.badRequest("Missing action or inventoryId");
+    }
+
+    const itemToUpdate = await storage.getFarmInventoryItem(inventoryId);
+
+    if (!itemToUpdate || itemToUpdate.userId !== userId) {
+      return Api.notFound("Item not found or you do not own this item.");
+    }
+
+    const itemInfo = FARM_ITEMS.find(i => i.id === itemToUpdate.itemId);
+    if (!itemInfo) {
+      return Api.notFound("Item metadata not found.");
+    }
+
+
+    switch (action) {
+      case 'toggle-lock': {
+        const updated = await storage.updateFarmInventoryItem(inventoryId, { locked: !itemToUpdate.locked });
+        return Api.ok(updated);
+      }
+
+      case 'dispose': {
+        if (itemInfo.rarity !== 'trash') {
+          return Api.badRequest("Only trash items can be disposed.");
+        }
+        if (itemToUpdate.locked) {
+          return Api.badRequest("Cannot dispose of a locked item.");
+        }
+        
+        const qtyToDispose = quantity || 1;
+        if(itemToUpdate.quantity > qtyToDispose) {
+          const updated = await storage.updateFarmInventoryItem(inventoryId, { quantity: itemToUpdate.quantity - qtyToDispose });
+          return Api.ok(updated);
+        } else {
+          await storage.deleteFarmInventoryItem(inventoryId);
+          return Api.ok({ message: "Item disposed" });
+        }
+      }
+
+      case 'sell': {
+        if (itemInfo.rarity === 'trash') {
+          return Api.badRequest("Trash items cannot be sold.");
+        }
+        if (itemToUpdate.locked) {
+          return Api.badRequest("Cannot sell a locked item.");
+        }
+
+        const qtyToSell = quantity || 1;
+        if (itemToUpdate.quantity < qtyToSell) {
+          return Api.badRequest("Not enough items to sell.");
+        }
+
+        const sellValue = itemInfo.sellPrice * qtyToSell;
+        
+        const wallet = await storage.getWalletByUserId(userId);
+        if(!wallet) {
+          return Api.notFound("Wallet not found");
+        }
+        await storage.updateWallet(wallet.id, { mobyTokens: wallet.mobyTokens + sellValue });
+
+        if(itemToUpdate.quantity > qtyToSell) {
+          const updated = await storage.updateFarmInventoryItem(inventoryId, { quantity: itemToUpdate.quantity - qtyToSell });
+          return Api.ok(updated);
+        } else {
+          await storage.deleteFarmInventoryItem(inventoryId);
+          return Api.ok({ message: "Item sold" });
+        }
+      }
+
+      default:
+        return Api.badRequest("Invalid action");
+    }
+  }
+}
+
+const handlers: IHandler[] = [
+  new FarmCharactersHandler(),
+  new FarmInventoryHandler(),
+];
+
+const server = await registerRoutes(app);
+
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+
+  res.status(status).json({ message });
+  throw err;
+});
+
+// importantly only setup vite in development and after
+// setting up all the other routes so the catch-all route
+// doesn't interfere with the other routes
+if (app.get("env") === "development") {
+  await setupVite(app, server);
+} else {
+  serveStatic(app);
+}
+
+// ALWAYS serve the app on port 5000
+// this serves both the API and the client.
+// It is the only port that is not firewalled.
+const port = process.env.PORT ? parseInt(process.env.PORT) : 5000;
+server.listen(port, '0.0.0.0', () => {
+  log(`serving on port ${port}`);
+});
+
+// Handle graceful shutdown
+process.on('SIGINT', async () => {
+  process.exit(0);
+});
