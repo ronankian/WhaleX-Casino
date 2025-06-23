@@ -2,28 +2,29 @@ import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   ChevronDown, User as UserIcon, LogOut, Wallet, ArrowDownCircle, ArrowUpCircle, Menu,
-  Home, Fish, Info, Dice5, Crown, Bomb, BarChart3, Target, Circle, Gamepad2, TrendingDown, Gem, FerrisWheel, Swords
+  Home, Fish, Info, Dice5, Crown, Bomb, BarChart3, Target, Circle, Gamepad2, TrendingDown, Gem, FerrisWheel, Swords, RefreshCw
 } from "lucide-react";
 import { useAuth } from "../../hooks/use-auth";
 
 const navItems = [
   { name: "Casino", path: "/casino", icon: <Crown className="w-5 h-5 mr-2" /> },
   { name: "Reef Tycoon", path: "/farm", icon: <Fish className="w-5 h-5 mr-2" /> },
-  { name: "About", path: "/about", icon: <Info className="w-5 h-5 mr-2" /> },
 ];
 
 const games = [
   { name: "Crash", path: "/games/crash", icon: <TrendingDown className="w-5 h-5 mr-2" /> },
   { name: "Dice", path: "/games/dice", icon: <Dice5 className="w-5 h-5 mr-2" /> },
-  { name: "Slot 777", path: "/games/slots", icon: <Gem className="w-5 h-5 mr-2" /> },
+  { name: "Slot", path: "/games/slots", icon: <Gem className="w-5 h-5 mr-2" /> },
   { name: "Hi-Lo", path: "/games/hilo", icon: <Target className="w-5 h-5 mr-2" /> },
   { name: "Mines", path: "/games/mines", icon: <Bomb className="w-5 h-5 mr-2" /> },
   { name: "Plinko", path: "/games/plinko", icon: <Circle className="w-5 h-5 mr-2" /> },
   { name: "Roulette", path: "/games/roulette", icon: <FerrisWheel className="w-5 h-5 mr-2" /> },
+  { name: "Lotto", path: "/games/lotto", icon: <BarChart3 className="w-5 h-5 mr-2" /> },
 ];
 
 export default function Header() {
   const { user, wallet, logout } = useAuth();
+  console.debug('Header wallet state:', wallet);
   const [location, setLocation] = useLocation();
   const [navOpen, setNavOpen] = useState(false);
   const [gamesOpen, setGamesOpen] = useState(false);
@@ -128,16 +129,16 @@ export default function Header() {
             </button>
             {profileOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-black/90 rounded-lg shadow-lg py-2 z-50 border border-gold-500/20">
-                <Link href="/profile" className="flex items-center gap-2 px-4 py-2 text-white hover:bg-gold-500/10 hover:text-gold-400 transition-colors">
-                  <UserIcon className="w-4 h-4" /> Profile
-                </Link>
                 <Link href="/wallet" className="flex items-center gap-2 px-4 py-2 text-white hover:bg-gold-500/10 hover:text-gold-400 transition-colors">
                   <Wallet className="w-4 h-4" /> Wallet
                 </Link>
-                <Link href="/deposit" className="flex items-center gap-2 px-4 py-2 text-white hover:bg-gold-500/10 hover:text-gold-400 transition-colors">
+                <Link href="/wallet?action=convert" className="flex items-center gap-2 px-4 py-2 text-white hover:bg-gold-500/10 hover:text-gold-400 transition-colors">
+                  <RefreshCw className="w-4 h-4" /> Convert
+                </Link>
+                <Link href="/wallet?action=deposit" className="flex items-center gap-2 px-4 py-2 text-white hover:bg-gold-500/10 hover:text-gold-400 transition-colors">
                   <ArrowDownCircle className="w-4 h-4" /> Deposit
                 </Link>
-                <Link href="/withdraw" className="flex items-center gap-2 px-4 py-2 text-white hover:bg-gold-500/10 hover:text-gold-400 transition-colors">
+                <Link href="/wallet?action=withdraw" className="flex items-center gap-2 px-4 py-2 text-white hover:bg-gold-500/10 hover:text-gold-400 transition-colors">
                   <ArrowUpCircle className="w-4 h-4" /> Withdraw
                 </Link>
                 <button

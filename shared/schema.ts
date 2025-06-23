@@ -89,7 +89,6 @@ export const farmInventory = pgTable("farm_inventory", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
   itemId: text("item_id").notNull(), // References the item ID from farm-items.ts
-  quantity: integer("quantity").notNull().default(1),
   locked: boolean("locked").notNull().default(false),
   caughtAt: timestamp("caught_at").notNull().defaultNow(),
 });

@@ -6,6 +6,7 @@ import { storage } from "./storage.js";
 import crypto from "crypto";
 import { hashPassword, verifyPassword } from "./utils.js";
 import { FARM_ITEMS, getRandomItem } from "./farm-items.js";
+import { InsertFarmInventory } from "@shared/schema";
 
 const loginSchema = z.object({
   username: z.string().min(1),
@@ -42,12 +43,31 @@ const LEVEL_UP_COSTS = [
   0.5850, 0.6400, 0.6975, 0.7575,
 ];
 
+const LEVEL_STATS = Array.from({ length: 25 }, (_, i) => {
+  const level = i + 1;
+  return {
+    level,
+    fishPerMin: 1 + Math.floor(level / 5), // Example: 1 at L1, 2 at L5, 3 at L10
+    bonusChance: level * 0.2, // Example: 0.2% at L1, 5% at L25
+  };
+});
+
 const ALL_CHARACTERS = [
   { name: "Fisherman", profileImg: "/farm/fishing/Character animation/Fisherman/Fisherman_profile.png" },
   { name: "Graverobber", profileImg: "/farm/fishing/Character animation/Graverobber/Graverobber_profile.png" },
   { name: "Steamman", profileImg: "/farm/fishing/Character animation/Steamman/Steamman_profile.png" },
   { name: "Woodcutter", profileImg: "/farm/fishing/Character animation/Woodcutter/Woodcutter_profile.png" },
 ];
+
+function getStorageSlots(level: number) {
+  let slots = 30;
+  if (level >= 25) slots += 5;
+  if (level >= 20) slots += 5;
+  if (level >= 15) slots += 5;
+  if (level >= 10) slots += 5;
+  if (level >= 5) slots += 10;
+  return slots;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -308,13 +328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check storage capacity
       const inventory = await storage.getFarmInventory(userId);
       const totalStorageSlots = hiredCharacters.reduce((acc, char) => {
-        let slots = 30;
-        if (char.level >= 25) slots += 5;
-        if (char.level >= 20) slots += 5;
-        if (char.level >= 15) slots += 5;
-        if (char.level >= 10) slots += 5;
-        if (char.level >= 5) slots += 10;
-        return acc + slots;
+        return acc + getStorageSlots(char.level);
       }, 0);
 
       if (inventory.length >= totalStorageSlots) {
@@ -367,12 +381,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate total storage capacity
       const totalStorageSlots = fishingCharacters.reduce((acc, char) => {
-        const staticChar = ALL_CHARACTERS.find(c => c.name === char.characterType);
-        return acc + (staticChar?.getStorageSlots(char.level) || 0);
+        return acc + getStorageSlots(char.level);
       }, 0);
       
       const inventory = await storage.getFarmInventory(userId);
-      let currentStorageUsed = inventory.reduce((acc, item) => acc + item.quantity, 0);
+      let currentStorageUsed = inventory.length; // Each item is a row, so length is the count
       let availableSpace = totalStorageSlots - currentStorageUsed;
       
       if (availableSpace <= 0) {
@@ -381,48 +394,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ newCatches: [], message: "Storage is full. Fishing stopped." });
       }
 
-      const newCatches: any[] = [];
-      let storageBecameFull = false;
+      const newCatchesForResponse: any[] = [];
+      const newInventoryItems: InsertFarmInventory[] = [];
+      const characterCatchCounts = new Map<number, number>();
+
 
       for (const character of fishingCharacters) {
+        if (availableSpace <= 0) break;
+        
         const staticChar = ALL_CHARACTERS.find(c => c.name === character.characterType);
         if (!staticChar) continue;
 
         const levelStats = LEVEL_STATS[character.level - 1];
-        if (!levelStats) continue;
+        if (!levelStats) {
+            continue;
+        };
 
         // --- Catch Logic ---
         const itemsToCatch = Math.floor(levelStats.fishPerMin);
         for (let i = 0; i < itemsToCatch; i++) {
           if (availableSpace <= 0) {
-            storageBecameFull = true;
             break;
           }
           
-          const caughtItem = getRandomItem(levelStats.bonusChance);
+          const caughtItem = getRandomItem();
           if (caughtItem) {
-            await storage.addOrUpdateFarmInventory(userId, caughtItem.id, 1);
-            await storage.incrementTotalCatch(character.id, 1);
+            // Add to the list of items to be bulk-inserted
+            newInventoryItems.push({
+              userId,
+              itemId: caughtItem.id,
+              // quantity is no longer needed, it defaults to 1
+            });
+
+            // Keep track of how many items this character caught
+            characterCatchCounts.set(character.id, (characterCatchCounts.get(character.id) || 0) + 1);
             
-            newCatches.push({
+            // Add to the list that we send back to the client for the history log
+            newCatchesForResponse.push({
               characterType: character.characterType,
               profileImg: staticChar.profileImg,
               itemName: caughtItem.name,
               itemImage: caughtItem.image,
               rarity: caughtItem.rarity,
             });
+
             availableSpace--;
-            currentStorageUsed++;
           }
         }
-        if (storageBecameFull) break;
       }
       
-      if (currentStorageUsed >= totalStorageSlots) {
+      // Perform bulk database operations after the loop
+      if (newInventoryItems.length > 0) {
+        await storage.addManyFarmInventoryItems(newInventoryItems);
+        for (const [charId, count] of characterCatchCounts.entries()) {
+          if (count > 0) {
+            await storage.incrementTotalCatch(charId, count);
+          }
+        }
+      }
+      
+      // If storage became full during this operation, stop fishing.
+      if (currentStorageUsed + newInventoryItems.length >= totalStorageSlots) {
         await storage.stopAllFishing(userId);
       }
 
-      res.json({ newCatches });
+      res.json({ newCatches: newCatchesForResponse });
     } catch (error) {
       console.error('Error processing catches:', error);
       res.status(500).json({ message: "Failed to process catches." });
@@ -451,13 +487,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manage farm inventory (lock, sell, dispose)
+  app.post("/api/farm/inventory/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const { action, inventoryId, quantity = 1 } = req.body;
+
+      if (!action || !inventoryId) {
+        return res.status(400).json({ message: "Missing action or inventoryId" });
+      }
+
+      const itemToUpdate = await storage.getFarmInventoryItem(inventoryId);
+      if (!itemToUpdate || itemToUpdate.userId !== userId) {
+        return res.status(404).json({ message: "Item not found or you do not own this item." });
+      }
+
+      const itemInfo = FARM_ITEMS.find(i => i.id === itemToUpdate.itemId);
+      if (!itemInfo) {
+        return res.status(404).json({ message: "Item metadata not found." });
+      }
+
+      switch (action) {
+        case 'toggle-lock': {
+          const updated = await storage.updateFarmInventoryItem(inventoryId, { 
+            locked: !itemToUpdate.locked 
+          });
+          return res.json(updated);
+        }
+
+        case 'dispose': {
+          if (itemInfo.rarity !== 'trash') {
+            return res.status(400).json({ message: "Only trash items can be disposed." });
+          }
+          if (itemToUpdate.locked) {
+            return res.status(400).json({ message: "Cannot dispose of a locked item." });
+          }
+          
+          await storage.deleteFarmInventoryItem(inventoryId);
+          return res.json({ message: "Item disposed", deleted: true, inventoryId });
+        }
+
+        case 'sell': {
+          if (itemInfo.rarity === 'trash') {
+            return res.status(400).json({ message: "Trash items cannot be sold." });
+          }
+          if (itemToUpdate.locked) {
+            return res.status(400).json({ message: "Cannot sell a locked item." });
+          }
+
+          const sellValue = itemInfo.tokenValue;
+          
+          const wallet = await storage.getWallet(userId);
+          if (!wallet) {
+            return res.status(404).json({ message: "Wallet not found" });
+          }
+          
+          const currentMoby = parseFloat(wallet.mobyTokens);
+          const newMoby = (currentMoby + sellValue).toFixed(4);
+          await storage.updateWallet(wallet.userId, { mobyTokens: newMoby });
+
+          await storage.deleteFarmInventoryItem(inventoryId);
+          
+          return res.json({ 
+            message: "Item sold", 
+            deleted: true,
+            inventoryId,
+            soldValue: sellValue,
+            newBalance: wallet.mobyTokens + sellValue 
+          });
+        }
+
+        default:
+          return res.status(400).json({ message: "Invalid action" });
+      }
+    } catch (error) {
+      console.error("Error managing inventory:", error);
+      res.status(500).json({ message: "Error managing inventory", error: (error as Error).message });
+    }
+  });
+
   // Game routes
   app.post("/api/games/play", async (req, res) => {
     try {
       const { gameType, betAmount, gameData, userId } = gamePlaySchema.parse(req.body);
 
+      console.log('--- SLOTS GAME DEBUG ---');
+      console.log('userId:', userId);
+      console.log('betAmount:', betAmount);
       const wallet = await storage.getWallet(userId);
+      console.log('wallet:', wallet);
       if (!wallet || parseFloat(wallet.coins) < betAmount) {
+        console.log('WALLET CHECK FAILED:', !wallet ? 'No wallet found' : `Balance: ${wallet.coins}, Bet: ${betAmount}`);
         return res.status(400).json({ message: "Insufficient funds" });
       }
 
@@ -487,20 +607,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           break;
 
         case "slots":
-          const symbols = ['fish', 'crown', 'gem', 'ship', 'anchor'];
+          const symbols = ['fish', 'anchor', 'ship', 'crown', 'gem'];
+          const symbolMultipliers = {
+            fish:   { 3: 0.75, 4: 1.5, 5: 2.5 },
+            anchor: { 3: 1.0, 4: 2.0, 5: 3.5 },
+            ship:   { 3: 1.5, 4: 3.0, 5: 6.0 },
+            crown:  { 3: 2.5, 4: 5.0, 5: 12.5 },
+            gem:    { 3: 4.0, 4: 7.5, 5: 25.0 },
+          };
           const reels = Array(5).fill(0).map((_, i) => 
             symbols[generateProvablyFairNumber(serverSeed, clientSeed, nonce + i, 0, symbols.length - 1)]
           );
-          
-          // Simple win logic - check for matching symbols
-          const matches = reels.filter(symbol => symbol === reels[0]).length;
+          // Check for matching symbols (all must match the first symbol)
+          const firstSymbol = reels[0];
+          const matches = reels.filter(symbol => symbol === firstSymbol).length;
+          let payout = 0;
+          let multiplier = 0;
+          if (matches >= 3) {
+            const m = symbolMultipliers[firstSymbol][matches] || 0;
+            payout = betAmount * m;
+            multiplier = m;
+          }
           result = { reels, matches };
           gameResult = {
             gameType,
             betAmount: betAmount.toString(),
-            payout: (matches >= 3 ? betAmount * (matches >= 5 ? 1000 : matches >= 4 ? 100 : matches >= 3 ? 10 : 0) : 0).toFixed(2),
+            payout: payout.toFixed(2),
             isWin: matches >= 3,
-            multiplier: (matches >= 5 ? 1000 : matches >= 4 ? 100 : matches >= 3 ? 10 : 0).toFixed(2),
+            multiplier: multiplier.toFixed(2),
             result: JSON.stringify(result),
             serverSeed,
             clientSeed,
@@ -576,15 +710,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           const finalPosition = Math.floor(position);
-          const multipliers = [1000, 130, 26, 9, 4, 2, 1.5, 1, 0.5, 1, 1.5, 2, 4, 9, 26, 130, 1000];
-          const multiplier = multipliers[Math.max(0, Math.min(finalPosition, multipliers.length - 1))];
-          result = { ballPath, finalPosition, multiplier };
+          const multipliersArr = [1000, 130, 26, 9, 4, 2, 1.5, 1, 0.5, 1, 1.5, 2, 4, 9, 26, 130, 1000];
+          const plinkoMultiplier = multipliersArr[Math.max(0, Math.min(finalPosition, multipliersArr.length - 1))];
+          result = { ballPath, finalPosition, multiplier: plinkoMultiplier };
           gameResult = {
             gameType,
             betAmount: betAmount.toString(),
-            payout: (multiplier >= 1 ? betAmount * multiplier : 0).toFixed(2),
-            isWin: multiplier >= 1,
-            multiplier: multiplier.toFixed(2),
+            payout: (plinkoMultiplier >= 1 ? betAmount * plinkoMultiplier : 0).toFixed(2),
+            isWin: plinkoMultiplier >= 1,
+            multiplier: plinkoMultiplier.toFixed(2),
             result: JSON.stringify(result),
             serverSeed,
             clientSeed,

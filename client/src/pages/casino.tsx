@@ -1,3 +1,4 @@
+import React from "react";
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "../hooks/use-auth";
@@ -14,7 +15,8 @@ import {
   BarChart3,
   Gem,
   Circle,
-  Target
+  Target,
+  ArrowLeftRight
 } from "lucide-react";
 import { formatCurrency, formatMoby } from "../lib/game-utils";
 import GameLayout from "../components/games/game-layout";
@@ -48,72 +50,79 @@ export default function Casino() {
   };
 
   return (
-    <div className="min-h-screen pt-20 pb-8">
+    <div className="min-h-screen pb-8">
       <div className="container mx-auto px-4">
-        <div className="mb-8">
-          <h2 className="text-4xl font-display font-bold text-gold-500 mb-2">
-            Welcome Back, {user.username}
-          </h2>
-          <p className="text-gray-300">Ready to make some waves?</p>
+        {/* Featured Games and Conversion Info */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Game Cards: 3 columns on large screens */}
+          <div className="lg:col-span-3 pt-10">
+            <GameLayout title="✨Featured Games" description="Try your luck and skill in our most popular casino games!">{null}</GameLayout>
+          </div>
+          {/* Conversion Info Card: 1 column on the right */}
+          <div className="lg:col-span-1 flex flex-col gap-6 pt-20">
+            <div className="bg-black/80 border border-white/80 rounded-xl flex flex-col justify-center items-center p-8 text-center" style={{ width: '100%' }}>
+              <div className="text-3xl font-bold text-gold-400 mb-2">Conversion Rate</div>
+              <div className="flex items-center justify-center gap-4 mb-4">
+                <div className="rounded-full bg-black/80 p-1 shadow-[0_0_8px_3px_rgba(255,215,0,0.8)]">
+                  <img src="/images/coin.png" alt="WhaleX Coin" className="w-12 h-12" />
+                </div>
+                <ArrowLeftRight className="w-8 h-8 text-gold-400" />
+                <div className="rounded-full bg-black/80 p-1 shadow-[0_0_8px_3px_rgba(0,255,255,0.8)]">
+                  <img src="/images/$MOBY.png" alt="$MOBY Token" className="w-12 h-12" />
+                </div>
         </div>
-
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-          <Card className="glass-card border-gold-500/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-300">Balance</CardTitle>
-              <Coins className="h-4 w-4 text-gold-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gold-500">
-                {formatCurrency(stats.balance)}
+              <div className="text-2xl font-semibold text-ocean-400 mb-4">5,000 WhaleX Coin = 1 $MOBY Token</div>
+              <div className="text-gray-300 text-base mb-2">
+                Exchange your WhaleX Coins for $MOBY tokens and join the crypto action! $MOBY tokens can be used for exclusive features, rewards, and more.
               </div>
-              <p className="text-xs text-gray-400">Coins</p>
-            </CardContent>
-          </Card>
-
-          <Card className="glass-card border-gold-500/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-300">$MOBY</CardTitle>
-              <div className="text-ocean-400">🐋</div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-ocean-400">
-                {formatMoby(stats.moby)}
-              </div>
-              <p className="text-xs text-gray-400">
-                ≈ {formatCurrency(stats.moby * 5000)} Coins
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="glass-card border-gold-500/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-300">Games Played</CardTitle>
-              <Gamepad2 className="h-4 w-4 text-emerald-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-emerald-400">{stats.gamesPlayed}</div>
-              <p className="text-xs text-gray-400">Total</p>
-            </CardContent>
-          </Card>
-
-          <Card className="glass-card border-gold-500/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-300">Win Rate</CardTitle>
-              <Trophy className="h-4 w-4 text-yellow-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-400">{stats.winRate}%</div>
-              <p className="text-xs text-gray-400">All time</p>
-            </CardContent>
-          </Card>
+            </div>
+            {/* Top Betters Card */}
+            <div className="bg-black/80 border border-white/80 rounded-xl flex flex-col justify-center items-center p-6 text-center" style={{ width: '100%' }}>
+                <div className="text-xl font-bold text-gold-400 mb-5 text-center">Top Betters</div>
+              <ul className="space-y-2 w-full">
+                  <li className="flex justify-between items-center text-white/90">
+                    <span className="font-semibold">CryptoWhale99</span>
+                  <span className="text-green-400 font-bold">$12,500</span>
+                  </li>
+                  <li className="flex justify-between items-center text-white/90">
+                    <span className="font-semibold">LuckyDiver</span>
+                  <span className="text-green-400 font-bold">$9,800</span>
+                  </li>
+                  <li className="flex justify-between items-center text-white/90">
+                    <span className="font-semibold">OceanKing</span>
+                  <span className="text-green-400 font-bold">$8,420</span>
+                  </li>
+                  <li className="flex justify-between items-center text-white/90">
+                    <span className="font-semibold">BetMasterX</span>
+                  <span className="text-green-400 font-bold">$7,300</span>
+                  </li>
+                  <li className="flex justify-between items-center text-white/90">
+                    <span className="font-semibold">DeepSeaPro</span>
+                  <span className="text-green-400 font-bold">$6,750</span>
+                  </li>
+                  <li className="flex justify-between items-center text-white/90">
+                    <span className="font-semibold">SharkByte</span>
+                  <span className="text-green-400 font-bold">$6,200</span>
+                  </li>
+                  <li className="flex justify-between items-center text-white/90">
+                    <span className="font-semibold">SpinMaster</span>
+                  <span className="text-green-400 font-bold">$5,950</span>
+                  </li>
+                  <li className="flex justify-between items-center text-white/90">
+                    <span className="font-semibold">AquaAce</span>
+                  <span className="text-green-400 font-bold">$5,700</span>
+                  </li>
+                  <li className="flex justify-between items-center text-white/90">
+                    <span className="font-semibold">ReelRider</span>
+                  <span className="text-green-400 font-bold">$5,420</span>
+                  </li>
+                  <li className="flex justify-between items-center text-white/90">
+                    <span className="font-semibold">LuckySplash</span>
+                  <span className="text-green-400 font-bold">$5,100</span>
+                  </li>
+                </ul>
+            </div>
         </div>
-
-        {/* Featured Games */}
-        <div className="mb-12">
-          <h3 className="text-2xl font-display font-bold text-white mb-6">Featured Games</h3>
-          <GameLayout />
         </div>
 
         {/* Recent Activity */}

@@ -174,13 +174,16 @@ class FarmInventoryHandler implements IHandler {
           return Api.badRequest("Not enough items to sell.");
         }
 
-        const sellValue = itemInfo.sellPrice * qtyToSell;
+        const sellValue = itemInfo.tokenValue * qtyToSell;
         
-        const wallet = await storage.getWalletByUserId(userId);
+        const wallet = await storage.getWallet(userId);
         if(!wallet) {
           return Api.notFound("Wallet not found");
         }
-        await storage.updateWallet(wallet.id, { mobyTokens: wallet.mobyTokens + sellValue });
+        // Ensure mobyTokens is treated as a number for addition
+        const currentMoby = parseFloat(wallet.mobyTokens);
+        const newMoby = (currentMoby + sellValue).toFixed(4);
+        await storage.updateWallet(wallet.userId, { mobyTokens: newMoby });
 
         if(itemToUpdate.quantity > qtyToSell) {
           const updated = await storage.updateFarmInventoryItem(inventoryId, { quantity: itemToUpdate.quantity - qtyToSell });

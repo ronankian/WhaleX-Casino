@@ -4,13 +4,13 @@ import { neon } from "@neondatabase/serverless";
 import { eq } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import { hashPassword } from "../utils.js";
-import { db } from "./index.ts";
-import { farmCharacters, farmInventory, users, wallets } from "../../shared/schema.ts";
+import { db } from "./index";
+import { farmCharacters, farmInventory, users, wallets } from "../../shared/schema";
 import { FARM_ITEMS } from "../farm-items.js";
 
 /**
  * Creates a demo user account with pre-populated data for demonstration purposes.
- * This includes a user, wallet, hired characters, and a full inventory.
+ * This includes a user, wallet, hired characters, and a full inventory of unique items.
  */
 export async function createDemoAccount() {
   console.log("Checking for existing demo user...");
@@ -32,7 +32,6 @@ export async function createDemoAccount() {
         username: "demo",
         email: "demo@example.com",
         password: hashedPassword,
-        lastLogin: new Date(),
       })
       .returning();
     demoUser = demoUsers[0];
@@ -47,7 +46,7 @@ export async function createDemoAccount() {
 
   console.log("Setting up demo user's farm characters...");
   const characterNames = ["Fisherman", "Graverobber", "Steamman", "Woodcutter"];
-  const initialCatches = [45, 35, 30, 25]; // These must sum to 135
+  const initialCatches = [0, 0, 0, 0]; // Sums to 0
   
   await db
     .insert(farmCharacters)
@@ -63,42 +62,29 @@ export async function createDemoAccount() {
     )
     .returning();
 
-  console.log("Populating demo user's inventory to be exactly full...");
+  console.log("Populating demo user's inventory with unique items...");
   // The total storage capacity for 4 characters at level 10 is 135.
-  // We will add exactly 135 items to the inventory.
-  const totalItemsToInsert = 135;
-  const items = [];
+  // We will add 0 items to leave space.
+  const totalItemsToInsert = 0;
+  const inventoryToInsert = [];
   for (let i = 0; i < totalItemsToInsert; i++) {
-    // Just add a common item for simplicity.
-    const randomItem = FARM_ITEMS[Math.floor(Math.random() * 10)]; 
-    items.push({
+    const randomItem = FARM_ITEMS[Math.floor(Math.random() * FARM_ITEMS.length)]; 
+    inventoryToInsert.push({
       userId: demoUser.id,
       itemId: randomItem.id,
-      quantity: 1, // Add one item at a time
+      // quantity is no longer needed, it defaults to 1 in the schema
     });
   }
 
-  // To simulate a more realistic inventory, we will group the items.
-  const itemMap = new Map<number, number>();
-  for (const item of items) {
-    itemMap.set(item.itemId, (itemMap.get(item.itemId) || 0) + 1);
+  if (inventoryToInsert.length > 0) {
+    await db.insert(farmInventory).values(inventoryToInsert);
   }
-
-  const inventoryToInsert = Array.from(itemMap.entries()).map(
-    ([itemId, quantity]) => ({
-      userId: demoUser.id,
-      itemId,
-      quantity,
-    })
-  );
-
-  await db.insert(farmInventory).values(inventoryToInsert);
 
   console.log("✅ Demo account setup complete!");
   console.log("   - Username: demo");
   console.log("   - Password: demo");
-  console.log("   - Storage: 135/135");
-  console.log("   - Total Catches: 135");
+  console.log("   - Storage: 0/135");
+  console.log("   - Total Catches: 0");
 }
 
 createDemoAccount().catch((err) => {

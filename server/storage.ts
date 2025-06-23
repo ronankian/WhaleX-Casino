@@ -53,13 +53,16 @@ export interface IStorage {
   getFarmCharacter(userId: number, characterType: string): Promise<FarmCharacter | undefined>;
   createFarmCharacter(character: InsertFarmCharacter): Promise<FarmCharacter>;
   updateFarmCharacter(id: number, updates: Partial<FarmCharacter>): Promise<FarmCharacter | undefined>;
+  getFishingCharacters(userId: number): Promise<FarmCharacter[]>;
+  stopAllFishing(userId: number): Promise<void>;
+  incrementTotalCatch(characterId: number, amount: number): Promise<void>;
 
   // Farm Inventory operations
   getFarmInventory(userId: number): Promise<FarmInventory[]>;
   getFarmInventoryItem(inventoryId: number): Promise<FarmInventory | undefined>;
   findFarmInventoryItem(userId: number, itemId: string): Promise<FarmInventory | undefined>;
   addFarmInventoryItem(item: InsertFarmInventory): Promise<FarmInventory>;
-  addOrUpdateFarmInventoryItem(item: InsertFarmInventory): Promise<FarmInventory>;
+  addManyFarmInventoryItems(items: InsertFarmInventory[]): Promise<FarmInventory[]>;
   updateFarmInventoryItem(id: number, updates: Partial<FarmInventory>): Promise<FarmInventory | undefined>;
   deleteFarmInventoryItem(id: number): Promise<{ id: number }>;
 
@@ -216,6 +219,25 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async getFishingCharacters(userId: number): Promise<FarmCharacter[]> {
+    return db.select().from(farmCharacters)
+      .where(and(eq(farmCharacters.userId, userId), eq(farmCharacters.status, 'Fishing')));
+  }
+
+  async stopAllFishing(userId: number): Promise<void> {
+    await db.update(farmCharacters)
+      .set({ status: 'Idle' })
+      .where(and(eq(farmCharacters.userId, userId), eq(farmCharacters.status, 'Fishing')));
+  }
+  
+  async incrementTotalCatch(characterId: number, amount: number): Promise<void> {
+    const character = await db.select({ totalCatch: farmCharacters.totalCatch }).from(farmCharacters).where(eq(farmCharacters.id, characterId));
+    if (character.length > 0) {
+      const newTotal = character[0].totalCatch + amount;
+      await db.update(farmCharacters).set({ totalCatch: newTotal }).where(eq(farmCharacters.id, characterId));
+    }
+  }
+
   async getFarmInventory(userId: number): Promise<FarmInventory[]> {
     return db.select().from(farmInventory).where(eq(farmInventory.userId, userId)).orderBy(desc(farmInventory.caughtAt));
   }
@@ -236,6 +258,12 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async addManyFarmInventoryItems(items: InsertFarmInventory[]): Promise<FarmInventory[]> {
+    if (items.length === 0) return [];
+    const result = await db.insert(farmInventory).values(items).returning();
+    return result;
+  }
+
   async updateFarmInventoryItem(id: number, updates: Partial<FarmInventory>): Promise<FarmInventory | undefined> {
     const result = await db.update(farmInventory).set(updates).where(eq(farmInventory.id, id)).returning();
     return result[0];
@@ -244,19 +272,6 @@ export class DbStorage implements IStorage {
   async deleteFarmInventoryItem(id: number): Promise<{ id: number }> {
     const result = await db.delete(farmInventory).where(eq(farmInventory.id, id)).returning({ id: farmInventory.id });
     return result[0];
-  }
-
-  async addOrUpdateFarmInventoryItem(item: InsertFarmInventory): Promise<FarmInventory> {
-    const existingItem = await this.findFarmInventoryItem(item.userId, item.itemId);
-    
-    if (existingItem) {
-      const updatedItem = await this.updateFarmInventoryItem(existingItem.id, {
-        quantity: existingItem.quantity + (item.quantity || 1),
-      });
-      return updatedItem!;
-    } else {
-      return this.addFarmInventoryItem(item);
-    }
   }
 
   async getLevelStats(): Promise<any[]> {

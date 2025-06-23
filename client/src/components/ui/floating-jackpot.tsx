@@ -1,29 +1,39 @@
 import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { apiRequest } from "../../lib/queryClient";
+import { useLocation } from "wouter";
 
-export default function FloatingJackpot() {
+export default function FloatingJackpot({ refreshSignal }: { refreshSignal?: any }) {
   const [jackpot, setJackpot] = useState<any>(null);
   const [isVisible, setIsVisible] = useState(true);
+  const [location] = useLocation();
+
+  const fetchJackpot = async () => {
+    try {
+      const response = await apiRequest("GET", "/api/jackpot");
+      const data = await response.json();
+      setJackpot(data);
+    } catch (error) {
+      console.error("Failed to fetch jackpot:", error);
+    }
+  };
 
   useEffect(() => {
-    const fetchJackpot = async () => {
-      try {
-        const response = await apiRequest("GET", "/api/jackpot");
-        const data = await response.json();
-        setJackpot(data);
-      } catch (error) {
-        console.error("Failed to fetch jackpot:", error);
-      }
-    };
-
     fetchJackpot();
     // Refresh jackpot every 10 seconds for real-time updates
     const interval = setInterval(fetchJackpot, 10000);
     return () => clearInterval(interval);
   }, []);
 
-  if (!isVisible) {
+  // Refetch jackpot when refreshSignal changes
+  useEffect(() => {
+    if (refreshSignal !== undefined) {
+      fetchJackpot();
+    }
+  }, [refreshSignal]);
+
+  // Exclude on /casino page
+  if (!isVisible || location === "/casino") {
     return null;
   }
 

@@ -22,6 +22,7 @@ export default function DiceGame() {
   const [target, setTarget] = useState(50);
   const [lastRoll, setLastRoll] = useState<number | null>(null);
   const [clientSeed] = useState(generateClientSeed());
+  const [jackpotRefreshSignal, setJackpotRefreshSignal] = useState(0);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -42,6 +43,7 @@ export default function DiceGame() {
     onSuccess: (data) => {
       setLastRoll(data.result.roll);
       refreshWallet();
+      setJackpotRefreshSignal((sig) => sig + 1);
       
       if (data.gameResult.isWin) {
         toast({
@@ -110,7 +112,7 @@ export default function DiceGame() {
   };
 
   return (
-    <GameLayout title="Dice Roll" description="Roll between 1-100 and predict the outcome">
+    <GameLayout title="Dice Roll" description="Roll between 1-100 and predict the outcome" jackpotRefreshSignal={jackpotRefreshSignal}>
       <div className="max-w-4xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Game Display */}

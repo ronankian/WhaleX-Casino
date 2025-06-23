@@ -9,15 +9,22 @@ import { useToast } from "../hooks/use-toast";
 import { useAuth } from "../hooks/use-auth";
 import {
   FARM_ITEMS,
-  getRandomItem,
   RARITY_BORDERS,
   RARITY_LABELS,
   RARITY_TEXT_COLORS,
 } from "../lib/farm-items";
+import { ItemActionDialog } from '../components/farm/item-action-dialog';
+import { AquapediaItemDialog } from '../components/farm/aquapedia-item-dialog';
+import { LockIcon } from '../components/ui/icons';
 
 // Debug mode - set to true for 5 second countdown, false for 60 second countdown
 const DEBUG_MODE = false;
 const FISHING_COUNTDOWN = DEBUG_MODE ? 5 : 60;
+
+const CATCH_RATES = [
+  1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6,
+  3.8, 4.0, 4.2, 4.4, 4.6, 4.8, 5.0, 5.2, 5.4, 5.6, 5.8, 6.0,
+];
 
 const LEVEL_UP_COSTS = [
   0.0100, 0.0150, 0.0225, 0.0325, 0.0450, 0.0600, 0.0775, 0.0975, 0.1200, 0.1450,
@@ -35,7 +42,7 @@ const dockPositions = [
 ];
 
 export default function FarmPage() {
-  const { user } = useAuth();
+  const { user, refreshWallet } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("dock");
@@ -46,6 +53,11 @@ export default function FarmPage() {
   const [countdown, setCountdown] = useState(FISHING_COUNTDOWN);
   const [catchTimestamp, setCatchTimestamp] = useState<number | null>(null);
   const [isCatching, setIsCatching] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const [selectedAquapediaItem, setSelectedAquapediaItem] = useState<any | null>(null);
+  const [isItemActionOpen, setItemActionOpen] = useState(false);
+  const [isAquapediaItemOpen, setAquapediaItemOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const { data: farmData, isLoading: isLoadingFarm, isError: isErrorFarm } = useQuery({
     queryKey: ["farmCharacters", user?.id],
@@ -64,25 +76,15 @@ export default function FarmPage() {
     enabled: !!user,
   });
 
-  // Calculate the total number of occupied storage slots by summing quantities.
-  const currentStorageUsed = inventory.reduce((acc, item) => acc + item.quantity, 0);
-
-  // Create a "flattened" inventory array where each object represents a single item,
-  // which is what we'll use for rendering to ensure one item per slot.
-  const flattenedInventory = inventory.reduce((acc, item) => {
-    for (let i = 0; i < item.quantity; i++) {
-      // Give each unrolled item a unique key for React's rendering.
-      acc.push({ ...item, uniqueDisplayId: `${item.id}-${i}` });
-    }
-    return acc;
-  }, []);
+  // Each item is now a unique row, so the length of the array is the storage used.
+  const currentStorageUsed = inventory.length;
 
   const hireMutation = useMutation({
     mutationFn: hireCharacter,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["farmCharacters", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["wallet", user?.id] });
-      toast({ title: "Success", description: "Character hired!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/wallet/" + user?.id] });
+      toast({ description: "🧑‍🌾 Character hired!" });
     },
     onError: (error: any) => {
       toast({
@@ -97,8 +99,8 @@ export default function FarmPage() {
     mutationFn: levelUpCharacter,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["farmCharacters", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["wallet", user?.id] });
-      toast({ title: "Success", description: "Character leveled up!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/wallet/" + user?.id] });
+      toast({ description: "⭐ Character leveled up!" });
     },
     onError: (error: any) => {
       toast({
@@ -114,7 +116,7 @@ export default function FarmPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["farmCharacters", user?.id] });
       setIsFishing(true);
-      toast({ title: "Success", description: "Fishing started!" });
+      toast({ description: "🎣 Fishing started!" });
     },
     onError: (error: any) => {
       toast({
@@ -130,7 +132,7 @@ export default function FarmPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["farmCharacters", user?.id] });
       setIsFishing(false);
-      toast({ title: "Success", description: "Fishing stopped!" });
+      toast({ description: "🎣 Fishing stopped!" });
     },
     onError: (error: any) => {
       toast({
@@ -141,14 +143,40 @@ export default function FarmPage() {
     },
   });
   
+  const itemActionMutation = useMutation({
+    mutationFn: async ({ action, inventoryId }: { action: string, inventoryId: number }) => {
+      const response = await axios.post(`/api/farm/inventory/${user!.id}`, {
+        action,
+        inventoryId,
+      });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["farmInventory", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/wallet/" + user?.id] });
+      refreshWallet();
+      queryClient.refetchQueries({ queryKey: ["/api/wallet/" + user?.id] });
+      toast({ description: `🗃️ ${data.message || "Item action completed."}` });
+      setItemActionOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Action Failed",
+        description: error.response?.data?.message || "An unexpected error occurred.",
+      });
+    },
+    onSettled: () => {
+      setActionLoading(false);
+    }
+  });
+
   const processCatchesMutation = useMutation({
     mutationFn: processCatches,
     onSuccess: (data) => {
-      // The animation state is already set. This just handles the results.
       queryClient.invalidateQueries({ queryKey: ["farmCharacters", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["farmInventory", user?.id] });
 
-      // Update catch history if there were new catches
       if (data.newCatches && data.newCatches.length > 0) {
         setCatchHistory(prevHistory => 
           [...data.newCatches, ...prevHistory].slice(0, 10)
@@ -162,7 +190,6 @@ export default function FarmPage() {
         title: "Catch Processing Failed",
         description: error.response?.data?.message || "An unexpected error occurred.",
       });
-      // IMPORTANT: If the server fails, reset the state so the user isn't stuck.
       setIsCatching(false);
       setCountdown(FISHING_COUNTDOWN);
       setAnimationStates(prevStates => {
@@ -182,27 +209,35 @@ export default function FarmPage() {
   
   const allCharacters = farmData?.allCharacters || [];
   const hiredCharacters = farmData?.hiredCharacters || [];
+  const itemsByRarity = FARM_ITEMS.reduce((acc, item) => {
+    const { rarity } = item;
+    if (!acc[rarity]) {
+      acc[rarity] = [];
+    }
+    acc[rarity].push(item);
+    return acc;
+  }, {} as Record<string, any[]>);
 
-  // Check if any characters are fishing & initialize animations
+  const rarityOrder: (keyof typeof itemsByRarity)[] = ['mythic', 'legendary', 'epic', 'rare', 'uncommon', 'common', 'trash'];
+
+
   useEffect(() => {
     const fishingCharacters = hiredCharacters.filter((char: any) => char.status === 'Fishing');
     const currentlyFishing = fishingCharacters.length > 0;
     setIsFishing(currentlyFishing);
 
-    // Initialize animation states
     if (hiredCharacters.length > 0) {
       const initialStates = {};
       hiredCharacters.forEach((char, index) => {
         const position = dockPositions[index];
         if (position) {
-          initialStates[char.id] = position.animationType; // fish or row animation
+          initialStates[char.id] = position.animationType;
         }
       });
       setAnimationStates(initialStates);
     }
   }, [hiredCharacters]);
 
-  // Set up countdown timer for fishing
   useEffect(() => {
     if (!isFishing || !user || isCatching) {
       return;
@@ -211,16 +246,13 @@ export default function FarmPage() {
     const timer = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
-          // 1. Set catching state to pause the countdown and show "Catching..." text
           setIsCatching(true);
 
-          // 2. Immediately change the animation to the hook animation
           setAnimationStates(prevStates => {
             const newStates = { ...prevStates };
             hiredCharacters.forEach((char, index) => {
               if (char.status === 'Fishing') {
                 const position = dockPositions[index];
-                // Only change animation for characters that are supposed to 'fish'
                 if (position && position.animationType === 'fish') {
                   newStates[char.id] = 'hook';
                 }
@@ -229,10 +261,9 @@ export default function FarmPage() {
             return newStates;
           });
           
-          // 3. Call the server to acquire items. This was the missing piece.
           processCatchesMutation.mutate(user.id);
 
-          return 0; // Stop the countdown timer
+          return 0;
         }
         return prev - 1;
       });
@@ -241,20 +272,15 @@ export default function FarmPage() {
     return () => clearInterval(timer);
   }, [isFishing, user, isCatching, hiredCharacters, processCatchesMutation]);
 
-  // This effect runs when 'isCatching' becomes true. It waits for the duration
-  // of the hook animation, then reverts the state back to normal fishing.
   useEffect(() => {
     if (!isCatching) {
       return;
     }
 
-    // The hook animation GIF is about 1 second long. We set a timer for its duration.
     const animationTimer = setTimeout(() => {
-      // Animation is complete, resume the fishing cycle
       setIsCatching(false);
       setCountdown(FISHING_COUNTDOWN);
       
-      // Revert all fishing characters back to their default animation
       setAnimationStates(prevStates => {
         const revertedStates = { ...prevStates };
         hiredCharacters.forEach((char, index) => {
@@ -267,11 +293,23 @@ export default function FarmPage() {
         });
         return revertedStates;
       });
-    }, 1000); // Wait for the animation to finish
+    }, 1000);
 
-    // Cleanup the timer if the component unmounts or if isCatching changes
     return () => clearTimeout(animationTimer);
   }, [isCatching, hiredCharacters]);
+
+  const handleItemAction = (action: 'lock' | 'sell' | 'dispose') => {
+    if (!selectedItem) return;
+
+    setActionLoading(true);
+    
+    let apiAction = action;
+    if (action === 'lock') {
+      apiAction = 'toggle-lock' as any;
+    }
+    
+    itemActionMutation.mutate({ action: apiAction, inventoryId: selectedItem.id });
+  };
 
   if (!user) return <GameLayout title="🎣 Reef Tycoon" description="..."><div className="text-white">Please log in to play.</div></GameLayout>;
   if (isLoadingFarm || isLoadingLevelStats || isLoadingInventory) return <GameLayout title="🎣 Reef Tycoon" description="..."><div className="text-white">Loading Farm...</div></GameLayout>;
@@ -366,9 +404,7 @@ export default function FarmPage() {
                       <span className="text-gray-300">Catch Rate:</span>
                       <span className="font-semibold text-gold-400">
                         {character
-                          ? `${Math.round(
-                              (5 * (character.level - 1)) / 24 + 1
-                            )}/min`
+                          ? `${CATCH_RATES[character.level - 1].toFixed(1)}/min`
                           : "N/A"}
                       </span>
                     </div>
@@ -431,28 +467,19 @@ export default function FarmPage() {
           <Card className="bg-gray-900/50 border-gray-700">
             <CardHeader>
               <CardTitle className="font-bold flex items-center gap-2">
-                <LightbulbIcon className="w-5 h-5 text-yellow-400" /> How to
-                Play:
+                <LightbulbIcon className="w-5 h-5 text-yellow-400" /> How to Play:
               </CardTitle>
             </CardHeader>
             <CardContent className="text-sm space-y-3">
-              <p>
-                <strong className="text-base">1. Hire Characters:</strong>
-                <br /> Use WhaleX coins to hire characters (1,000 → 5,000 →
-                20,000 → 50,000)
-              </p>
-              <p>
-                <strong className="text-base">2. Start Fishing:</strong>
-                <br /> Click "Start Fishing" to begin the idle fishing session
-              </p>
-              <p>
-                <strong className="text-base">3. Collect Items:</strong>
-                <br /> Characters will automatically catch items every minute
-              </p>
-              <p>
-                <strong className="text-base">4. Manage Storage:</strong>
-                <br /> When storage is full, characters stop fishing automatically
-              </p>
+              <p className="text-base font-semibold mb-2">🌊 Welcome to Reef Tycoon!</p>
+              <p className="mb-2">Build your fishing empire by hiring characters, sending them out to fish, and collecting rare aquatic treasures. Manage your storage and level up your team to maximize your rewards!</p>
+              <ol className="space-y-2 list-decimal list-inside">
+                <li><span className="font-semibold">🧑‍🌾 Hire Characters:</span> Use WhaleX coins to recruit unique fishermen. Each character can be leveled up for better catch rates and bonuses.</li>
+                <li><span className="font-semibold">🎣 Start Fishing:</span> Assign your hired characters to fishing spots and start the idle fishing session. They will automatically catch items every minute.</li>
+                <li><span className="font-semibold">🦑 Collect & Manage:</span> Check your storage to see what your team has caught. Sell valuable fish and treasures for $MOBY tokens, or lock special items for your collection.</li>
+                <li><span className="font-semibold">📦 Upgrade & Expand:</span> Level up your characters to unlock more storage and increase your catch rate. Hire more characters to expand your fishing operation!</li>
+                <li><span className="font-semibold">💰 Earn Rewards:</span> Sell your catches to earn $MOBY tokens and climb the ranks to become the ultimate Reef Tycoon!</li>
+              </ol>
             </CardContent>
           </Card>
         </div>
@@ -463,20 +490,20 @@ export default function FarmPage() {
             {/* Tabs */}
             <div className="flex border-b border-gray-700 bg-gray-900/80">
               <button
-                className={`flex-1 px-6 py-3 font-semibold focus:outline-none transition-colors ${activeTab === "dock" ? "text-yellow-400 border-b-2 border-yellow-400" : "text-gray-300 hover:text-yellow-300"}`}
                 onClick={() => setActiveTab("dock")}
+                className={`flex-1 px-6 py-3 font-semibold focus:outline-none transition-colors ${activeTab === "dock" ? "text-yellow-400 border-b-2 border-yellow-400" : "text-gray-300 hover:text-yellow-300"}`}
               >
                 Dock
               </button>
               <button
-                className={`flex-1 px-6 py-3 font-semibold focus:outline-none transition-colors ${activeTab === "storage" ? "text-yellow-400 border-b-2 border-yellow-400" : "text-gray-300 hover:text-yellow-300"}`}
                 onClick={() => setActiveTab("storage")}
+                className={`flex-1 px-6 py-3 font-semibold focus:outline-none transition-colors ${activeTab === "storage" ? "text-yellow-400 border-b-2 border-yellow-400" : "text-gray-300 hover:text-yellow-300"}`}
               >
                 Storage ({currentStorageUsed}/{totalStorageSlots})
               </button>
               <button
-                className={`flex-1 px-6 py-3 font-semibold focus:outline-none transition-colors ${activeTab === "aquapedia" ? "text-yellow-400 border-b-2 border-yellow-400" : "text-gray-300 hover:text-yellow-300"}`}
                 onClick={() => setActiveTab("aquapedia")}
+                className={`flex-1 px-6 py-3 font-semibold focus:outline-none transition-colors ${activeTab === "aquapedia" ? "text-yellow-400 border-b-2 border-yellow-400" : "text-gray-300 hover:text-yellow-300"}`}
               >
                 Aquapedia
               </button>
@@ -549,8 +576,6 @@ export default function FarmPage() {
                     
                     let imageSrc = `/farm/fishing/Character animation/${characterName}/${characterName}_${currentAnimationType}.gif`;
 
-                    // To force the browser to replay the GIF, we append a unique timestamp
-                    // to its src each time the catch is initiated.
                     if (currentAnimationType === 'hook') {
                         imageSrc += `?t=${catchTimestamp}`;
                     }
@@ -569,67 +594,75 @@ export default function FarmPage() {
               )}
               {activeTab === "storage" && (
                 <div className="absolute inset-0 p-4 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-yellow-400 [&::-webkit-scrollbar-thumb:hover]:bg-yellow-500">
-                  <div className="grid grid-cols-10 gap-2">
-                    {flattenedInventory.map((item: any) => {
+                  <div className="grid grid-cols-9 gap-2">
+                    {inventory.map((item: any) => {
                       const itemInfo = FARM_ITEMS.find(i => i.id === item.itemId);
                       if (!itemInfo) return null;
                       
-                        return (
-                          <div
-                          key={item.uniqueDisplayId}
-                            className={`w-full aspect-square bg-gray-800/50 border-2 ${
-                            RARITY_BORDERS[itemInfo.rarity]
-                            } rounded-md flex items-center justify-center relative group`}
-                          >
-                            <img
-                            src={itemInfo.image}
-                            alt={itemInfo.name}
-                              className="w-10 h-10 object-contain"
-                            />
-                            <div className="absolute top-0 right-0 text-xs p-1 tracking-[-0.2em]">
-                            {RARITY_LABELS[itemInfo.rarity]}
-                          </div>
-                            <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-center text-xs p-1 rounded-b-md opacity-0 group-hover:opacity-100 transition-opacity">
-                            {itemInfo.name}
-                          </div>
+                      return (
+                        <div
+                          key={item.id}
+                           className={`w-full aspect-square bg-gray-800/50 border-2 ${RARITY_BORDERS[itemInfo.rarity]} rounded-md flex items-center justify-center relative group cursor-pointer`}
+                           onClick={() => { setSelectedItem(item); setItemActionOpen(true); }}
+                        >
+                             <img
+                             src={itemInfo.image}
+                             alt={itemInfo.name}
+                               className="w-10 h-10 object-contain"
+                             />
+                          {item.locked && (
+                             <div className="absolute top-0 left-0 p-1">
+                               <LockIcon className="w-4 h-4 text-blue-400" />
+                            </div>
+                          )}
+                             <div className="absolute top-0 right-0 text-xs p-1 tracking-[-0.2em]">
+                             {RARITY_LABELS[itemInfo.rarity]}
+                           </div>
+                             <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-center text-xs p-1 rounded-b-md opacity-0 group-hover:opacity-100 transition-opacity">
+                             {itemInfo.name}
+                           </div>
                         </div>
                       );
                     })}
-                    {Array.from({ length: totalStorageSlots - flattenedInventory.length }).map((_, index) => (
-                      <div
-                        key={`empty-${index}`}
-                        className="w-full aspect-square bg-gray-800/50 border border-gray-700 rounded-md flex items-center justify-center"
-                      >
-                        {/* Empty slot */}
-                      </div>
-                    ))}
-                  </div>
+                     {Array.from({ length: totalStorageSlots - inventory.length }).map((_, index) => (
+                       <div
+                         key={`empty-${index}`}
+                         className="w-full aspect-square bg-gray-800/50 border border-gray-700 rounded-md flex items-center justify-center"
+                       >
+                         {/* Empty slot */}
+                       </div>
+                     ))}
+                   </div>
                 </div>
               )}
               {activeTab === "aquapedia" && (
                 <div className="absolute inset-0 p-4 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-yellow-400 [&::-webkit-scrollbar-thumb:hover]:bg-yellow-500">
-                  <div className="grid grid-cols-10 gap-2">
-                    {FARM_ITEMS.map((item) => (
-                      <div
-                        key={item.id}
-                        className={`w-full aspect-square border-2 ${
-                          RARITY_BORDERS[item.rarity]
-                        } rounded-md flex items-center justify-center relative group bg-black/50`}
-                      >
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-10 h-10 object-contain"
-                        />
-                        <div className="absolute top-0 right-0 text-xs p-1 tracking-[-0.2em]">
-                          {RARITY_LABELS[item.rarity]}
-                        </div>
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-center text-xs p-1 rounded-b-md opacity-0 group-hover:opacity-100 transition-opacity">
-                          {item.name}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                   <div className="grid grid-cols-9 gap-2">
+                     {FARM_ITEMS.map((item) => (
+                       <div
+                         key={item.id}
+                         className={`w-full aspect-square border-2 ${
+                           RARITY_BORDERS[item.rarity]
+                         } rounded-md flex items-center justify-center relative group bg-black/50 cursor-pointer`}
+                          onClick={() => {
+                            setSelectedAquapediaItem(item);
+                            setAquapediaItemOpen(true);
+                          }}
+                       >
+                         <img
+                           src={item.image}
+                           alt={item.name}
+                           className="w-10 h-10 object-contain"
+                         />
+                         <div className="absolute top-0 right-0 text-xs p-1 tracking-[-0.2em]">
+                           {RARITY_LABELS[item.rarity]}
+                         </div>
+                         <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-center text-xs p-1 rounded-b-md opacity-0 group-hover:opacity-100 transition-opacity">
+                           {item.name}
+                         </div>
+                       </div>
+                     ))}
+                   </div>
                 </div>
               )}
             </div>
@@ -663,6 +696,24 @@ export default function FarmPage() {
           </Card>
         </div>
       </div>
+
+      {isItemActionOpen && (
+        <ItemActionDialog
+          isOpen={isItemActionOpen}
+          onClose={() => setItemActionOpen(false)}
+          item={selectedItem}
+          inventory={inventory}
+          onAction={handleItemAction}
+          isLoading={actionLoading}
+        />
+      )}
+      {isAquapediaItemOpen && (
+        <AquapediaItemDialog
+          isOpen={isAquapediaItemOpen}
+          onClose={() => setAquapediaItemOpen(false)}
+          item={selectedAquapediaItem}
+        />
+      )}
     </GameLayout>
   );
 } 
@@ -741,26 +792,6 @@ function StarIcon(props: React.SVGProps<SVGSVGElement>) {
       strokeLinejoin="round"
     >
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-    </svg>
-  );
-}
-
-function LockIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
     </svg>
   );
 }

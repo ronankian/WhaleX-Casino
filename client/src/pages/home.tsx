@@ -85,13 +85,7 @@ export default function Home() {
       description: "Watch the multiplier grow and cash out before it crashes!"
     },
     {
-      name: "Dice",
-      icon: <Gamepad2 className="h-6 w-6" />,
-      path: "/games/dice",
-      description: "Roll the dice and test your luck with customizable odds"
-    },
-    {
-      name: "Slot 777",
+      name: "Slot",
       icon: <Star className="h-6 w-6" />,
       path: "/games/slots",
       description: "Classic slot machine with modern crypto rewards"
@@ -109,23 +103,17 @@ export default function Home() {
       description: "Navigate through the minefield and collect gems"
     },
     {
-      name: "Plinko",
-      icon: <TrendingUp className="h-6 w-6" />,
-      path: "/games/plinko",
-      description: "Drop the ball and watch it bounce to your fortune"
-    },
-    {
-      name: "Roulette",
-      icon: <Circle className="h-6 w-6" />,
-      path: "/games/roulette",
-      description: "Place your bets on the classic roulette wheel"
+      name: "Lotto",
+      icon: <Coins className="h-6 w-6" />,
+      path: "/games/lotto",
+      description: "Try your luck in our crypto lottery for big prizes!"
     }
   ];
 
   const updates = [
     {
-      title: "Reel MOBY",
-      description: "Our new mining game where you can earn $MOBY tokens by solving puzzles and mining blocks",
+      title: "Reef Tycoon",
+      description: "Our new reef-building game where you can earn $MOBY tokens by managing your own coral empire and growing your underwater fortune.",
       date: "Latest Update",
       icon: <Fish className="h-5 w-5" />
     },
@@ -210,7 +198,7 @@ export default function Home() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {games.slice(0, 5).map((game, index) => (
+            {games.map((game, index) => (
               <Link key={index} href={game.path} className="group">
                 <div className="p-6 rounded-xl transition-all duration-300 transform hover:scale-105 bg-black/70 backdrop-blur-md hover:shadow-neon-gold-intense">
                   <div className="flex items-center mb-4">
