@@ -1043,6 +1043,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create demo01 account route
+  app.post("/api/create-demo01", async (req, res) => {
+    try {
+      // Check if demo01 user already exists
+      let demoUser = await storage.getUserByUsername("demo01");
+      
+      if (demoUser) {
+        // Update existing user's wallet to 100,000 coins
+        await storage.updateWallet(demoUser.id, { coins: "100000.00" });
+        res.json({ 
+          message: "Demo01 account updated successfully",
+          username: "demo01",
+          password: "demo123",
+          coins: "100000.00"
+        });
+      } else {
+        // Create new demo01 user
+        const hashedPassword = await hashPassword("demo123");
+        const newUser = await storage.createUser({
+          username: "demo01",
+          email: "demo01@example.com",
+          password: hashedPassword,
+        });
+        
+        // Create wallet with 100,000 coins
+        await storage.createWallet({
+          userId: newUser.id,
+          coins: "100000.00",
+        });
+        
+        res.json({ 
+          message: "Demo01 account created successfully",
+          username: "demo01",
+          password: "demo123",
+          coins: "100000.00"
+        });
+      }
+    } catch (error) {
+      console.error("Error creating demo01 account:", error);
+      res.status(500).json({ message: "Error creating demo01 account" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
