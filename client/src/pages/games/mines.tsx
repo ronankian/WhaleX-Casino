@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "../../hooks/use-auth";
 import { useMutation } from "@tanstack/react-query";
@@ -11,6 +11,65 @@ import { Badge } from "../../components/ui/badge";
 import { Bomb, Gem, DollarSign, History, Users } from "lucide-react";
 import { useToast } from "../../hooks/use-toast";
 import { generateClientSeed, formatCurrency, BET_AMOUNTS } from "../../lib/game-utils";
+
+// Preloaded Audio System for instant playback
+class AudioManager {
+  private sounds: { [key: string]: HTMLAudioElement } = {};
+  
+  constructor() {
+    this.preloadSounds();
+  }
+  
+  private preloadSounds() {
+    const soundFiles = {
+      win: '/sounds/win.mp3',
+      lose: '/sounds/lose.mp3',
+      cashOut: '/sounds/win.mp3',
+      gem: '/sounds/win.mp3'
+    };
+    
+    Object.entries(soundFiles).forEach(([key, path]) => {
+      const audio = new Audio(path);
+      audio.volume = 0.5;
+      audio.preload = 'auto';
+      
+      audio.addEventListener('canplaythrough', () => {
+        console.log(`Audio ${key} preloaded successfully`);
+      });
+      
+      audio.addEventListener('error', (e) => {
+        console.warn(`Failed to preload audio ${key}:`, e);
+      });
+      
+      this.sounds[key] = audio;
+    });
+  }
+  
+  play(soundName: string) {
+    const sound = this.sounds[soundName];
+    if (sound) {
+      try {
+        sound.currentTime = 0;
+        sound.play().catch(error => {
+          console.log(`Could not play sound ${soundName}:`, error);
+        });
+      } catch (error) {
+        console.log(`Sound error for ${soundName}:`, error);
+      }
+    } else {
+      console.warn(`Sound ${soundName} not found in preloaded sounds`);
+    }
+  }
+  
+  setVolume(volume: number) {
+    Object.values(this.sounds).forEach(sound => {
+      sound.volume = Math.max(0, Math.min(1, volume));
+    });
+  }
+}
+
+// Create global audio manager instance
+const audioManager = new AudioManager();
 
 // Mines game multiplier table based on correct guesses
 const MINES_MULTIPLIERS = {
@@ -25,14 +84,14 @@ const calculateMultiplier = (revealedCount: number): number => {
   return MINES_MULTIPLIERS[revealedCount as keyof typeof MINES_MULTIPLIERS] || 1;
 };
 
-function seededRandom(seed) {
+function seededRandom(seed: number) {
   // Simple LCG for deterministic random numbers
   let x = Math.sin(seed) * 10000;
   return x - Math.floor(x);
 }
 
-function getMinePositions(seed, mineCount, gridSize) {
-  const positions = [];
+function getMinePositions(seed: number, mineCount: number, gridSize: number) {
+  const positions: number[] = [];
   let i = 0;
   while (positions.length < mineCount) {
     // Use a different seed for each mine
@@ -76,7 +135,7 @@ export default function MinesGame() {
       const response = await apiRequest("POST", "/api/games/play", {
         userId: user?.id,
         gameType: "mines",
-        betAmount: gameActive ? 0 : betAmount,
+        betAmount: gameData.isFirstRound ? betAmount : 0,
         gameData,
       });
       return response.json();
@@ -86,6 +145,7 @@ export default function MinesGame() {
       
       if (isMine) {
         setMineLocations(mines || []);
+        audioManager.play("lose");
         toast({
           title: "💥 Mine Hit!",
           description: "You hit a mine! Game over.",
@@ -99,6 +159,7 @@ export default function MinesGame() {
       } else {
         setRevealedCells(newRevealed);
         const newMultiplier = calculateMultiplier(newRevealed.length);
+        audioManager.play("gem");
         toast({
           title: "💎 Safe!",
           description: `Found a gem! Multiplier: ${newMultiplier.toFixed(2)}x`,
@@ -128,7 +189,7 @@ export default function MinesGame() {
         userId: user?.id,
         gameType: "mines",
         betAmount: payout,
-        gameData: { cashOut: true, revealedCells },
+        gameData: { cashOut: true, multiplier, revealedCells },
       });
       return response.json();
     },
@@ -139,6 +200,8 @@ export default function MinesGame() {
       setMultiplier(1);
       setHistory(prev => [...prev, { isWin: true, payout }]);
       refreshWallet();
+      
+      audioManager.play("cashOut");
       
       toast({
         title: "💰 Cashed Out!",
@@ -161,7 +224,7 @@ export default function MinesGame() {
       selectedCell: cellIndex,
       revealedCells,
       mineCount: 5,
-      gridSize: 5, // <-- NOT 25!
+      gridSize: 5,
       clientSeed,
       nonce: Date.now(),
     });
@@ -174,6 +237,19 @@ export default function MinesGame() {
   };
 
   const handleStartGame = () => {
+    if (!canPlay) return;
+    
+    // Start the game with first round bet
+    playGameMutation.mutate({
+      isFirstRound: true,
+      selectedCell: -1, // No cell selected yet
+      revealedCells: [],
+      mineCount: 5,
+      gridSize: 5,
+      clientSeed,
+      nonce: Date.now(),
+    });
+    
     setGameActive(true);
     setRevealedCells([]);
     setMultiplier(1);
