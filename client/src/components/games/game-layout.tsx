@@ -9,6 +9,7 @@ interface GameLayoutProps {
   description: string;
   children: ReactNode;
   jackpotRefreshSignal?: any;
+  headerBg?: string;
 }
 
 const games = [
@@ -70,7 +71,7 @@ const games = [
   },
 ];
 
-export default function GameLayout({ title, description, children, jackpotRefreshSignal }: GameLayoutProps) {
+export default function GameLayout({ title, description, children, jackpotRefreshSignal, headerBg }: GameLayoutProps) {
 
   return (
     <div className="min-h-screen pt-20 pb-8">
@@ -84,30 +85,23 @@ export default function GameLayout({ title, description, children, jackpotRefres
 
       {/* Game Title - Full Width */}
       <div className="relative text-center mb-8 w-full">
-        {/* Background Image for Crash Game */}
-        {(title === "Crash" || title === "🎰Slot") && (
+        {/* Generic Background Image for any game if headerBg is provided */}
+        {headerBg && (
           <div 
             className="absolute inset-0 bg-cover bg-bottom bg-no-repeat opacity-40 w-full"
-            style={{ 
-              backgroundImage: `url(${title === "Crash" ? "/images/crash.jpg" : "/images/slots.jpg"})`,
-              ...(title === "🎰Slot" ? { backgroundImage: 'url(/images/slots.png)', backgroundPosition: 'left top', backgroundSize: 'contain' } : {})
-            }}
+            style={{ backgroundImage: `url(${headerBg})` }}
           />
         )}
         {/* Dark overlay for better text readability */}
-        {(title === "Crash" || title === "🎰Slot") && (
+        {headerBg && (
           <div className="absolute inset-0 bg-black/60 w-full" />
         )}
         {/* Content */}
-        <div className={`relative z-10 ${(title === "Crash" || title === "🎰Slot") ? "py-8 px-6" : ""}`}>
-          <h2 className={`text-4xl font-display font-bold mb-2 flex items-center justify-center gap-3 ${(title === "Crash" || title === "🎰Slot") ? "text-white drop-shadow-lg" : "text-gold-500"}`}>
-            {title === "Crash" && <span className="text-5xl">🚀</span>}
-            {title === "🎰Slot" && <span className="text-5xl">🎰</span>}
-            {title.replace('🎰', '').trim()}
+        <div className={`relative z-10 ${headerBg ? "py-8 px-6" : ""}`}>
+          <h2 className={`text-4xl font-display font-bold mb-2 flex items-center justify-center gap-3 ${headerBg ? "text-white drop-shadow-lg" : "text-gold-500"}`}>
+            {title}
           </h2>
-          <p className={`${(title === "Crash" || title === "🎰Slot") ? "text-white/90 drop-shadow-md" : "text-gray-300"}`}>
-            {description}
-          </p>
+          <p className={`${headerBg ? "text-white/90 drop-shadow-md" : "text-gray-300"}`}>{description}</p>
         </div>
       </div>
 

@@ -18,7 +18,7 @@ export default function SlotsGame() {
   const { toast } = useToast();
 
   const [betAmount, setBetAmount] = useState(25);
-  const [reels, setReels] = useState(["🐟", "👑", "💎", "🚢", "⚓"]);
+  const [reels, setReels] = useState(["⚓", "👑", "💎"]);
   const [isSpinning, setIsSpinning] = useState(false);
   const [clientSeed] = useState(generateClientSeed());
   const winAudio = useRef<HTMLAudioElement | null>(null);
@@ -36,15 +36,20 @@ export default function SlotsGame() {
     loseAudio.current = new window.Audio('/sounds/lose.mp3');
   }, []);
 
-  // Calculate win chance (3, 4, or 5 of a kind out of all possible outcomes)
-  const winChance = 100 * (5 * 4 + 5) / Math.pow(5, 4); // Simplified for 5 reels, 5 symbols
-  const maxWin = betAmount * 50;
+  // Calculate win chance (2 or 3 of a kind out of all possible outcomes)
+  const winChance = 100 * (3 * 2 + 1) / Math.pow(3, 3); // Simplified for 3 reels, 3 symbols
+  const maxWin = betAmount * 6;
   const canPlay = wallet && betAmount <= parseFloat(wallet.coins) && betAmount > 0 && !isSpinning;
 
   console.log('SLOTS FRONTEND DEBUG', { user, userId: user?.id, betAmount });
 
   const playGameMutation = useMutation({
-    mutationFn: async (body) => {
+    mutationFn: async (body: {
+      userId: number;
+      gameType: string;
+      betAmount: number;
+      gameData: { clientSeed: string; nonce: number };
+    }) => {
       const response = await apiRequest("POST", "/api/games/play", body);
       return response.json();
     },
@@ -56,7 +61,7 @@ export default function SlotsGame() {
       refreshWallet();
       const matches = data.result.matches;
       const payout = parseFloat(data.gameResult.payout);
-      const isWin = matches >= 3;
+      const isWin = matches >= 2;
       setHistory(prev => [{ payout, isWin }, ...prev.slice(0, 7)]);
       if (isWin) {
         winAudio.current?.play();
@@ -90,25 +95,41 @@ export default function SlotsGame() {
 
   const handleSpin = () => {
     if (!canPlay) return;
+    if (!user || !user.id) {
+      console.error('No user or user.id found at spin time:', user);
+      toast({
+        title: "User Error",
+        description: "User not loaded. Please log in again.",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsSpinning(true);
-    console.log("SLOTS REQUEST", {
-      userId: user?.id,
-      gameType: "slots",
-      betAmount,
-      gameData: {
-        clientSeed,
-        nonce: Date.now(),
+    // Start spinning animation: show random symbols for 1 second
+    const spinSymbols = ["⚓", "👑", "💎"];
+    let spinCount = 0;
+    const spinInterval = setInterval(() => {
+      setReels([
+        spinSymbols[Math.floor(Math.random() * 3)],
+        spinSymbols[Math.floor(Math.random() * 3)],
+        spinSymbols[Math.floor(Math.random() * 3)]
+      ]);
+      spinCount++;
+      if (spinCount > 10) { // ~1 second if interval is 100ms
+        clearInterval(spinInterval);
+        // After spinning, send request to server
+        console.log('SLOTS SPIN DEBUG', { user, userId: user.id });
+        playGameMutation.mutate({
+          userId: user.id,
+          gameType: "slots",
+          betAmount,
+          gameData: {
+            clientSeed,
+            nonce: Date.now(),
+          }
+        });
       }
-    });
-    playGameMutation.mutate({
-      userId: user.id,
-      gameType: "slots",
-      betAmount,
-      gameData: {
-        clientSeed,
-        nonce: Date.now(),
-      }
-    });
+    }, 100);
   };
 
   return (
@@ -173,7 +194,7 @@ export default function SlotsGame() {
                   </>
                 )}
               </Button>
-              {!canPlay && (
+              {!canPlay && !isSpinning && (
                 <p className="text-red-400 text-sm mt-2">
                   Insufficient balance or invalid bet
                 </p>
@@ -233,46 +254,28 @@ export default function SlotsGame() {
                     <tr className="text-gold-400">
                       <th className="px-2 py-1">Symbol</th>
                       <th className="px-2 py-1">Name</th>
+                      <th className="px-2 py-1">2 of a Kind</th>
                       <th className="px-2 py-1">3 of a Kind</th>
-                      <th className="px-2 py-1">4 of a Kind</th>
-                      <th className="px-2 py-1">5 of a Kind</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr className="bg-ocean-900/50 rounded-lg">
-                      <td className="px-2 py-1 text-2xl flex items-center justify-center gap-2"><span>🐟</span></td>
-                      <td className="px-2 py-1 text-sm text-gray-300">Fish</td>
-                      <td className="px-2 py-1 text-white-400 font-semibold">0.75x</td>
-                      <td className="px-2 py-1 text-white-400 font-semibold">1.5x</td>
-                      <td className="px-2 py-1 text-white-400 font-semibold">2.5x</td>
-                    </tr>
-                    <tr className="bg-ocean-900/50 rounded-lg">
                       <td className="px-2 py-1 text-2xl flex items-center justify-center gap-2"><span>⚓</span></td>
                       <td className="px-2 py-1 text-sm text-gray-300">Anchor</td>
-                      <td className="px-2 py-1 text-white-400 font-semibold">1.0x</td>
-                      <td className="px-2 py-1 text-white-400 font-semibold">2.0x</td>
-                      <td className="px-2 py-1 text-white-400 font-semibold">3.5x</td>
-                    </tr>
-                    <tr className="bg-ocean-900/50 rounded-lg">
-                      <td className="px-2 py-1 text-2xl flex items-center justify-center gap-2"><span>🚢</span></td>
-                      <td className="px-2 py-1 text-sm text-gray-300">Ship</td>
                       <td className="px-2 py-1 text-white-400 font-semibold">1.5x</td>
-                      <td className="px-2 py-1 text-white-400 font-semibold">3.0x</td>
-                      <td className="px-2 py-1 text-white-400 font-semibold">6.0x</td>
+                      <td className="px-2 py-1 text-white-400 font-semibold">2.5x</td>
                     </tr>
                     <tr className="bg-ocean-900/50 rounded-lg">
                       <td className="px-2 py-1 text-2xl flex items-center justify-center gap-2"><span>👑</span></td>
                       <td className="px-2 py-1 text-sm text-gray-300">Crown</td>
-                      <td className="px-2 py-1 text-white-400 font-semibold">2.5x</td>
-                      <td className="px-2 py-1 text-white-400 font-semibold">5.0x</td>
-                      <td className="px-2 py-1 text-white-400 font-semibold">12.5x</td>
+                      <td className="px-2 py-1 text-white-400 font-semibold">2.0x</td>
+                      <td className="px-2 py-1 text-white-400 font-semibold">3.5x</td>
                     </tr>
                     <tr className="bg-ocean-900/50 rounded-lg">
-                      <td className="px-2 py-1 text-2xl flex   items-center justify-center gap-2"><span>💎</span></td>
-                      <td className="px-2 py-1 text-sm text-gray-300">Diamond</td>
-                      <td className="px-2 py-1 text-white-400 font-semibold">4.0x</td>
-                      <td className="px-2 py-1 text-white-400 font-semibold">7.5x</td>
-                      <td className="px-2 py-1 text-white-400 font-semibold">25.0x</td>
+                      <td className="px-2 py-1 text-2xl flex items-center justify-center gap-2"><span>💎</span></td>
+                      <td className="px-2 py-1 text-sm text-gray-300">Gem</td>
+                      <td className="px-2 py-1 text-white-400 font-semibold">3.0x</td>
+                      <td className="px-2 py-1 text-white-400 font-semibold">6.0x</td>
                     </tr>
                   </tbody>
                 </table>

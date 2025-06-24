@@ -568,254 +568,414 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Game routes
   app.post("/api/games/play", async (req, res) => {
+    console.log("GAMES PLAY BODY:", req.body);
     try {
-      const { gameType, betAmount, gameData, userId } = gamePlaySchema.parse(req.body);
+      const { userId, gameType, betAmount, gameData } = req.body;
+      console.log("PARSED PARAMS:", { userId, gameType, betAmount, hasGameData: !!gameData });
+      
+      if (!userId || !gameType) {
+        console.log("VALIDATION FAILED:", { userId, gameType });
+        return res.status(400).json({ message: "Missing or invalid parameters" });
+      }
 
-      console.log('--- SLOTS GAME DEBUG ---');
-      console.log('userId:', userId);
-      console.log('betAmount:', betAmount);
+      // Fetch wallet
       const wallet = await storage.getWallet(userId);
-      console.log('wallet:', wallet);
-      if (!wallet || parseFloat(wallet.coins) < betAmount) {
-        console.log('WALLET CHECK FAILED:', !wallet ? 'No wallet found' : `Balance: ${wallet.coins}, Bet: ${betAmount}`);
+      if (!wallet) {
+        return res.status(400).json({ message: "Wallet not found" });
+      }
+      const balance = parseFloat(wallet.coins);
+
+      // Handle different game types
+      switch (gameType) {
+        case "slots": {
+          if (!betAmount || betAmount <= 0) {
+            return res.status(400).json({ message: "Invalid bet amount" });
+          }
+      if (balance < betAmount) {
         return res.status(400).json({ message: "Insufficient funds" });
       }
 
-      const serverSeed = crypto.randomBytes(32).toString("hex");
-      const clientSeed = gameData.clientSeed || crypto.randomBytes(32).toString("hex");
-      const nonce = gameData.nonce || 0;
-
-      let result: any;
-      let gameResult: any;
-
-      switch (gameType) {
-        case "dice":
-          const diceTarget = gameData.target || 50;
-          const diceRoll = generateProvablyFairNumber(serverSeed, clientSeed, nonce, 1, 100);
-          result = { roll: diceRoll, target: diceTarget };
-          gameResult = {
-            gameType,
-            betAmount: betAmount.toString(),
-            payout: (diceRoll < diceTarget ? betAmount * (99 / Math.max(1, diceTarget - 1)) : 0).toFixed(2),
-            isWin: diceRoll < diceTarget,
-            multiplier: (diceRoll < diceTarget ? (99 / Math.max(1, diceTarget - 1)) : 0).toFixed(2),
-            result: JSON.stringify(result),
-            serverSeed,
-            clientSeed,
-            nonce
-          };
-          break;
-
-        case "slots":
-          const symbols = ['fish', 'anchor', 'ship', 'crown', 'gem'];
-          const symbolMultipliers = {
-            fish:   { 3: 0.75, 4: 1.5, 5: 2.5 },
-            anchor: { 3: 1.0, 4: 2.0, 5: 3.5 },
-            ship:   { 3: 1.5, 4: 3.0, 5: 6.0 },
-            crown:  { 3: 2.5, 4: 5.0, 5: 12.5 },
-            gem:    { 3: 4.0, 4: 7.5, 5: 25.0 },
-          };
-          const reels = Array(5).fill(0).map((_, i) => 
-            symbols[generateProvablyFairNumber(serverSeed, clientSeed, nonce + i, 0, symbols.length - 1)]
-          );
-          // Check for matching symbols (all must match the first symbol)
-          const firstSymbol = reels[0];
-          const matches = reels.filter(symbol => symbol === firstSymbol).length;
-          let payout = 0;
-          let multiplier = 0;
-          if (matches >= 3) {
-            const m = symbolMultipliers[firstSymbol][matches] || 0;
-            payout = betAmount * m;
-            multiplier = m;
-          }
-          result = { reels, matches };
-          gameResult = {
-            gameType,
-            betAmount: betAmount.toString(),
-            payout: payout.toFixed(2),
-            isWin: matches >= 3,
-            multiplier: multiplier.toFixed(2),
-            result: JSON.stringify(result),
-            serverSeed,
-            clientSeed,
-            nonce
-          };
-          break;
-
-        case "hilo":
-          const currentCard = gameData.currentCard || generateProvablyFairNumber(serverSeed, clientSeed, nonce, 1, 13);
-          const nextCard = generateProvablyFairNumber(serverSeed, clientSeed, nonce + 1, 1, 13);
-          const guess = gameData.guess; // "higher" or "lower"
-          
-          result = { currentCard, nextCard, guess };
-          gameResult = {
-            gameType,
-            betAmount: betAmount.toString(),
-            payout: (
-              (guess === "higher" && nextCard > currentCard) || 
-              (guess === "lower" && nextCard < currentCard)
-              ? betAmount * Math.max(1, (gameData.streak || 0) + 1) * 1.5
-              : 0
-            ).toFixed(2),
-            isWin: (guess === "higher" && nextCard > currentCard) || 
-                    (guess === "lower" && nextCard < currentCard),
-            multiplier: (
-              (guess === "higher" && nextCard > currentCard) || 
-              (guess === "lower" && nextCard < currentCard)
-              ? Math.max(1, (gameData.streak || 0) + 1) * 1.5
-              : 0
-            ).toFixed(2),
-            result: JSON.stringify(result),
-            serverSeed,
-            clientSeed,
-            nonce
-          };
-          break;
-
-        case "mines":
-          const gridSize = gameData.gridSize || 25;
-          const mineCount = gameData.mineCount || 5;
-          const revealedCells = gameData.revealedCells || [];
-          const selectedCell = gameData.selectedCell;
-          
-          // Generate mine positions
-          const mines = [];
-          for (let i = 0; i < mineCount; i++) {
-            mines.push(generateProvablyFairNumber(serverSeed, clientSeed, nonce + i, 0, gridSize - 1));
-          }
-          
-          result = { selectedCell, isMine: !mines.includes(selectedCell), revealedCells: [...revealedCells, selectedCell] };
-          gameResult = {
-            gameType,
-            betAmount: betAmount.toString(),
-            payout: (mines.includes(selectedCell) ? 0 : betAmount * Math.pow(1.2, revealedCells.length + 1)).toFixed(2),
-            isWin: !mines.includes(selectedCell),
-            multiplier: (mines.includes(selectedCell) ? 0 : Math.pow(1.2, revealedCells.length + 1)).toFixed(2),
-            result: JSON.stringify(result),
-            serverSeed,
-            clientSeed,
-            nonce
-          };
-          break;
-
-        case "plinko":
-          const rows = gameData.rows || 16;
-          const ballPath = [];
-          let position = rows / 2;
-          
-          for (let i = 0; i < rows; i++) {
-            const direction = generateProvablyFairNumber(serverSeed, clientSeed, nonce + i, 0, 1);
-            position += direction === 0 ? -0.5 : 0.5;
-            ballPath.push(position);
-          }
-          
-          const finalPosition = Math.floor(position);
-          const multipliersArr = [1000, 130, 26, 9, 4, 2, 1.5, 1, 0.5, 1, 1.5, 2, 4, 9, 26, 130, 1000];
-          const plinkoMultiplier = multipliersArr[Math.max(0, Math.min(finalPosition, multipliersArr.length - 1))];
-          result = { ballPath, finalPosition, multiplier: plinkoMultiplier };
-          gameResult = {
-            gameType,
-            betAmount: betAmount.toString(),
-            payout: (plinkoMultiplier >= 1 ? betAmount * plinkoMultiplier : 0).toFixed(2),
-            isWin: plinkoMultiplier >= 1,
-            multiplier: plinkoMultiplier.toFixed(2),
-            result: JSON.stringify(result),
-            serverSeed,
-            clientSeed,
-            nonce
-          };
-          break;
-
-        case "roulette":
-          const betType = gameData.betType || "number";
-          const betValue = gameData.betValue || 0;
-          const winningNumber = generateProvablyFairNumber(serverSeed, clientSeed, nonce, 0, 36);
-          
-          result = { winningNumber, betType, betValue };
-          gameResult = {
-            gameType,
-            betAmount: betAmount.toString(),
-            payout: (
-              betType === "number" && winningNumber === betValue ? betAmount * 35 :
-              betType === "red" && [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(winningNumber) ? betAmount * 2 :
-              betType === "black" && [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35].includes(winningNumber) ? betAmount * 2 :
-              betType === "even" && winningNumber % 2 === 0 && winningNumber !== 0 ? betAmount * 2 :
-              betType === "odd" && winningNumber % 2 === 1 ? betAmount * 2 :
-              0
-            ).toFixed(2),
-            isWin: (
-              betType === "number" && winningNumber === betValue ||
-              betType === "red" && [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(winningNumber) ||
-              betType === "black" && [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35].includes(winningNumber) ||
-              betType === "even" && winningNumber % 2 === 0 && winningNumber !== 0 ||
-              betType === "odd" && winningNumber % 2 === 1
-            ),
-            multiplier: (
-              betType === "number" && winningNumber === betValue ? 35 :
-              betType === "red" && [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(winningNumber) ? 2 :
-              betType === "black" && [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35].includes(winningNumber) ? 2 :
-              betType === "even" && winningNumber % 2 === 0 && winningNumber !== 0 ? 2 :
-              betType === "odd" && winningNumber % 2 === 1 ? 2 :
-              0
-            ).toFixed(2),
-            result: JSON.stringify(result),
-            serverSeed,
-            clientSeed,
-            nonce
-          };
-          break;
-
-        case "crash":
-          const crashPoint = generateCrashPoint(serverSeed, clientSeed, nonce);
-          const cashOutPoint = gameData.cashOut !== undefined ? gameData.cashOut : 1.0;
-          
-          // If cashOut is 0, it means the game crashed before cash out (loss)
-          result = { crashPoint, cashOut: cashOutPoint };
-          gameResult = {
-            gameType,
-            betAmount: betAmount.toString(),
-            payout: (cashOutPoint > 0 && cashOutPoint <= crashPoint ? cashOutPoint : 0).toFixed(2),
-            isWin: cashOutPoint > 0 && cashOutPoint <= crashPoint,
-            multiplier: (cashOutPoint > 0 && cashOutPoint <= crashPoint ? cashOutPoint : 0).toFixed(2),
-            result: JSON.stringify(result),
-            serverSeed,
-            clientSeed,
-            nonce
-          };
-          break;
+      // Slot logic: 3 reels, 3 symbols
+      const symbols = ["anchor", "crown", "gem"];
+      const symbolMultipliers = {
+        anchor: { 2: 1.5, 3: 2.5 },
+        crown:  { 2: 2.0, 3: 3.5 },
+        gem:    { 2: 3.0, 3: 6.0 },
+      };
+      const reels = [
+        symbols[Math.floor(Math.random() * 3)],
+        symbols[Math.floor(Math.random() * 3)],
+        symbols[Math.floor(Math.random() * 3)],
+      ];
+      const firstSymbol = reels[0];
+      const matches = reels.filter(s => s === firstSymbol).length;
+      let payout = 0;
+      let multiplier = 0;
+      if (matches >= 2) {
+            multiplier = (symbolMultipliers as any)[firstSymbol]?.[matches] || 0;
+        payout = betAmount * multiplier;
       }
 
-      // Update wallet based on win/loss
-      const newBalance = parseFloat(wallet.coins) + (gameResult.payout - betAmount);
+      // Update wallet
+      const newBalance = balance - betAmount + payout;
       await storage.updateWallet(userId, { coins: newBalance.toFixed(2) });
 
-      // Add to jackpot if it's a loss
-      if (!gameResult.isWin && betAmount > 0) {
-        const jackpotContribution = betAmount * 0.10; // 10% contribution
+      if (payout === 0 && betAmount > 0) {
+        const jackpotContribution = betAmount / 5000;
         await storage.addToJackpot(jackpotContribution);
       }
 
-      // Save game result to DB
-      await storage.createGameResult({
-        userId,
-        gameType,
-        betAmount: betAmount.toString(),
-        payout: gameResult.payout.toString(),
-        isWin: gameResult.isWin,
-        clientSeed,
-        serverSeed,
-        nonce,
+      // Respond
+          return res.json({
+        result: { reels, matches },
+        gameResult: {
+          payout,
+          isWin: payout > 0,
+          newBalance: newBalance.toFixed(2),
+        }
       });
+        }
 
-      res.json({
-        result,
-        gameResult,
-        newBalance: newBalance.toFixed(2),
-      });
+        case "hilo": {
+          console.log("HILO GAME DATA:", { gameData, betAmount, isFirstRound: gameData?.isFirstRound });
+          
+          if (!gameData) {
+            return res.status(400).json({ message: "Missing game data" });
+          }
 
-    } catch (error) {
-      console.error("Game play error:", error);
-      res.status(400).json({ message: "Invalid game play data" });
+          const { currentCard, guess, streak, isFirstRound } = gameData;
+          
+          // Handle first round bet
+          if (isFirstRound) {
+            if (!betAmount || betAmount <= 0) {
+              return res.status(400).json({ message: "Invalid bet amount" });
+            }
+            if (balance < betAmount) {
+              return res.status(400).json({ message: "Insufficient funds" });
+            }
+            
+            // Deduct bet amount on first round
+            const newBalance = balance - betAmount;
+            await storage.updateWallet(userId, { coins: newBalance.toFixed(2) });
+            
+            // Add to jackpot
+            const jackpotContribution = betAmount / 5000;
+            await storage.addToJackpot(jackpotContribution);
+          }
+
+          // Generate next card (1-13, where 1=Ace, 11=Jack, 12=Queen, 13=King)
+          const nextCard = Math.floor(Math.random() * 13) + 1;
+          
+          // Determine if guess is correct
+          let isWin = false;
+          if (guess === "higher" && nextCard > currentCard) {
+            isWin = true;
+          } else if (guess === "lower" && nextCard < currentCard) {
+            isWin = true;
+          }
+
+          // Calculate payout if win
+          let payout = 0;
+          let finalBalance = balance;
+          
+          if (isWin) {
+            const multiplier = 1 + (streak * 0.5); // 1x base + 0.5x per streak
+            payout = betAmount * multiplier;
+            
+            // Get current wallet balance (after bet was deducted)
+            const currentWallet = await storage.getWallet(userId);
+            if (currentWallet) {
+              const currentBalance = parseFloat(currentWallet.coins);
+              finalBalance = currentBalance + payout;
+              await storage.updateWallet(userId, { coins: finalBalance.toFixed(2) });
+            }
+          } else {
+            // If not first round and lost, no additional wallet update needed
+            // If first round and lost, bet was already deducted above
+            const currentWallet = await storage.getWallet(userId);
+            if (currentWallet) {
+              finalBalance = parseFloat(currentWallet.coins);
+            }
+          }
+
+          console.log("HILO RESULT:", { isWin, payout, finalBalance });
+
+          return res.json({
+            result: { 
+              currentCard: nextCard, 
+              nextCard: null, 
+              guess 
+            },
+            gameResult: {
+              payout,
+              isWin,
+              newBalance: finalBalance.toFixed(2),
+              mobyReward: "0.0000"
+            }
+          });
+        }
+
+        case "crash": {
+          if (!betAmount || betAmount <= 0) {
+            return res.status(400).json({ message: "Invalid bet amount" });
+          }
+          if (balance < betAmount) {
+            return res.status(400).json({ message: "Insufficient funds" });
+          }
+
+          const { cashOut } = gameData || {};
+          
+          // If this is a cash-out request (player successfully cashed out)
+          if (cashOut && cashOut > 0) {
+            // Calculate payout based on cash-out multiplier
+            const payout = betAmount * cashOut;
+            
+            // Add winnings to wallet (bet was already deducted when game started)
+            const newBalance = balance + payout;
+            await storage.updateWallet(userId, { coins: newBalance.toFixed(2) });
+
+            return res.json({
+              result: { cashOut },
+              gameResult: {
+                payout,
+                isWin: true,
+                newBalance: newBalance.toFixed(2),
+                mobyReward: "0.0000"
+              }
+            });
+          }
+          
+          // If this is a crash (game crashed before player cashed out)
+          // Generate crash point
+          const crashPoint = generateCrashPoint("server-seed", gameData?.clientSeed || "default", gameData?.nonce || Date.now());
+          
+          // Update wallet (deduct bet)
+          const newBalance = balance - betAmount;
+          await storage.updateWallet(userId, { coins: newBalance.toFixed(2) });
+
+          // Add to jackpot
+          const jackpotContribution = betAmount / 5000;
+          await storage.addToJackpot(jackpotContribution);
+
+          return res.json({
+            result: { crashPoint },
+            gameResult: {
+              payout: 0,
+              isWin: false,
+              newBalance: newBalance.toFixed(2),
+              mobyReward: "0.0000"
+            }
+          });
+        }
+
+        case "dice": {
+          if (!betAmount || betAmount <= 0) {
+            return res.status(400).json({ message: "Invalid bet amount" });
+          }
+          if (balance < betAmount) {
+            return res.status(400).json({ message: "Insufficient funds" });
+          }
+
+          const { target } = gameData || {};
+          if (!target || target < 1 || target > 100) {
+            return res.status(400).json({ message: "Invalid target" });
+          }
+
+          // Generate roll
+          const roll = generateProvablyFairNumber("server-seed", gameData?.clientSeed || "default", gameData?.nonce || Date.now(), 1, 100);
+          
+          // Determine win
+          const isWin = roll >= target;
+          const multiplier = isWin ? (99 / (100 - target)) : 0;
+          const payout = isWin ? betAmount * multiplier : 0;
+
+          // Update wallet
+          const newBalance = balance - betAmount + payout;
+          await storage.updateWallet(userId, { coins: newBalance.toFixed(2) });
+
+          if (payout === 0) {
+            const jackpotContribution = betAmount / 5000;
+            await storage.addToJackpot(jackpotContribution);
+          }
+
+          return res.json({
+            result: { roll },
+            gameResult: {
+              payout,
+              isWin,
+              newBalance: newBalance.toFixed(2),
+              mobyReward: "0.0000"
+            }
+          });
+        }
+
+        case "mines": {
+          if (!gameData) {
+            return res.status(400).json({ message: "Missing game data" });
+          }
+
+          const { selectedCell, revealedCells, mineCount, gridSize, isFirstRound } = gameData;
+          
+          // Handle first round bet
+          if (isFirstRound) {
+            if (!betAmount || betAmount <= 0) {
+              return res.status(400).json({ message: "Invalid bet amount" });
+            }
+            if (balance < betAmount) {
+              return res.status(400).json({ message: "Insufficient funds" });
+            }
+            
+            // Deduct bet amount on first round
+            const newBalance = balance - betAmount;
+            await storage.updateWallet(userId, { coins: newBalance.toFixed(2) });
+            
+            // Add to jackpot
+            const jackpotContribution = betAmount / 5000;
+            await storage.addToJackpot(jackpotContribution);
+          }
+
+          // Generate mine positions (simplified - in real implementation would use provably fair)
+          const totalCells = gridSize * gridSize;
+          const minePositions = [];
+          while (minePositions.length < mineCount) {
+            const pos = Math.floor(Math.random() * totalCells);
+            if (!minePositions.includes(pos)) {
+              minePositions.push(pos);
+            }
+          }
+
+          // Check if selected cell is a mine
+          const isMine = minePositions.includes(selectedCell);
+          const newRevealedCells = [...revealedCells, selectedCell];
+
+          let payout = 0;
+          let multiplier = 1;
+          
+          if (!isMine) {
+            // Calculate multiplier based on revealed cells and mine count
+            const safeCells = totalCells - mineCount;
+            const revealedSafeCells = newRevealedCells.filter(cell => !minePositions.includes(cell)).length;
+            multiplier = (safeCells / (safeCells - revealedSafeCells + 1));
+          }
+
+          return res.json({
+            result: { 
+              isMine, 
+              revealedCells: newRevealedCells 
+            },
+            gameResult: {
+              payout,
+              isWin: !isMine,
+              multiplier: multiplier.toFixed(2),
+              newBalance: wallet.coins,
+              mobyReward: "0.0000"
+            }
+          });
+        }
+
+        case "plinko": {
+          if (!betAmount || betAmount <= 0) {
+            return res.status(400).json({ message: "Invalid bet amount" });
+          }
+          if (balance < betAmount) {
+            return res.status(400).json({ message: "Insufficient funds" });
+          }
+
+          const { rows } = gameData || {};
+          const multipliers = [1000, 130, 26, 9, 4, 2, 1.5, 1, 0.5, 1, 1.5, 2, 4, 9, 26, 130, 1000];
+          
+          // Generate ball path and final position
+          const finalPosition = Math.floor(Math.random() * multipliers.length);
+          const multiplier = multipliers[finalPosition];
+          const payout = betAmount * multiplier;
+
+          // Update wallet
+          const newBalance = balance - betAmount + payout;
+          await storage.updateWallet(userId, { coins: newBalance.toFixed(2) });
+
+          if (payout === 0) {
+            const jackpotContribution = betAmount / 5000;
+            await storage.addToJackpot(jackpotContribution);
+          }
+
+          return res.json({
+            result: { multiplier },
+            gameResult: {
+              payout,
+              isWin: payout > 0,
+              newBalance: newBalance.toFixed(2),
+              mobyReward: "0.0000"
+            }
+          });
+        }
+
+        case "roulette": {
+          if (!betAmount || betAmount <= 0) {
+            return res.status(400).json({ message: "Invalid bet amount" });
+          }
+          if (balance < betAmount) {
+            return res.status(400).json({ message: "Insufficient funds" });
+          }
+
+          const { betType } = gameData || {};
+          if (!betType) {
+            return res.status(400).json({ message: "Missing bet type" });
+          }
+
+          // Generate winning number
+          const winningNumber = Math.floor(Math.random() * 37); // 0-36
+          
+          // Calculate payout based on bet type
+          let payout = 0;
+          let isWin = false;
+          
+          switch (betType) {
+            case "red":
+              isWin = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(winningNumber);
+              payout = isWin ? betAmount * 2 : 0;
+              break;
+            case "black":
+              isWin = [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35].includes(winningNumber);
+              payout = isWin ? betAmount * 2 : 0;
+              break;
+            case "even":
+              isWin = winningNumber !== 0 && winningNumber % 2 === 0;
+              payout = isWin ? betAmount * 2 : 0;
+              break;
+            case "odd":
+              isWin = winningNumber !== 0 && winningNumber % 2 === 1;
+              payout = isWin ? betAmount * 2 : 0;
+              break;
+            default:
+              return res.status(400).json({ message: "Invalid bet type" });
+          }
+
+          // Update wallet
+          const newBalance = balance - betAmount + payout;
+          await storage.updateWallet(userId, { coins: newBalance.toFixed(2) });
+
+          if (payout === 0) {
+            const jackpotContribution = betAmount / 5000;
+            await storage.addToJackpot(jackpotContribution);
+          }
+
+          return res.json({
+            result: { winningNumber },
+            gameResult: {
+              payout,
+              isWin,
+              newBalance: newBalance.toFixed(2),
+              mobyReward: "0.0000"
+            }
+          });
+        }
+
+        default:
+          return res.status(400).json({ message: "Unsupported game type" });
+      }
+    } catch (err) {
+      console.error("GAME ERROR", err);
+      res.status(500).json({ message: "Server error" });
     }
   });
 

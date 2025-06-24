@@ -46,7 +46,8 @@ export function getCardValue(card: string): number {
   return parseInt(card);
 }
 
-export function formatCard(value: number): string {
+export function formatCard(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "?";
   if (value === 1) return "A";
   if (value === 11) return "J";
   if (value === 12) return "Q";

@@ -8,13 +8,12 @@ import {
   type Withdrawal, type InsertWithdrawal, type Jackpot, type InsertJackpot,
   type FarmCharacter, type InsertFarmCharacter, type FarmInventory, type InsertFarmInventory
 } from "@shared/schema";
+import { sql } from "drizzle-orm";
+import { db } from "./db";
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not set");
 }
-
-const sql = neon(process.env.DATABASE_URL);
-const db = drizzle(sql);
 
 export interface IStorage {
   // User operations
@@ -192,11 +191,8 @@ export class DbStorage implements IStorage {
   }
 
   async addToJackpot(amount: number): Promise<Jackpot | undefined> {
-    const currentJackpot = await this.getJackpot();
-    if (!currentJackpot) return undefined;
-    
-    const newTotal = parseFloat(currentJackpot.totalPool) + amount;
-    return this.updateJackpot({ totalPool: newTotal.toFixed(4) });
+    await db.execute(sql`UPDATE jackpot SET total_pool = total_pool + ${amount} WHERE id = 1`);
+    return this.getJackpot();
   }
 
   async getFarmCharacters(userId: number): Promise<FarmCharacter[]> {
